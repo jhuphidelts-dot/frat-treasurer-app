@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Dashboard - Fraternity Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-success">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('main.dashboard') }}">
+                <i class="bi bi-person-circle"></i> My Portal
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('auth.profile') }}">
+                    <i class="bi bi-person-gear"></i> Profile
+                </a>
+                <a class="nav-link" href="{{ url_for('auth.logout') }}">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="mb-4">
+                    <i class="bi bi-person-circle"></i> Welcome, {{ current_user.first_name }}!
+                    <small class="text-muted">Your fraternity financial dashboard</small>
+                </h1>
+                
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+
+        <!-- Dues Overview Cards -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card {{ 'bg-success' if balance_due <= 0 else 'bg-warning' }} text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title">Dues Status</h5>
+                                <h2 class="mb-0">
+                                    {% if balance_due <= 0 %}
+                                        PAID UP
+                                    {% else %}
+                                        ${{ "%.2f"|format(balance_due) }} DUE
+                                    {% endif %}
+                                </h2>
+                            </div>
+                            <i class="bi {{ 'bi-check-circle-fill' if balance_due <= 0 else 'bi-exclamation-triangle-fill' }} fs-1"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title">Total Paid</h5>
+                                <h2 class="mb-0">${{ "%.2f"|format(total_paid) }}</h2>
+                            </div>
+                            <i class="bi bi-cash-coin fs-1"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title">Semester Dues</h5>
+                                <h2 class="mb-0">${{ "%.2f"|format(member.dues_amount) }}</h2>
+                            </div>
+                            <i class="bi bi-calendar-check fs-1"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Payment History -->
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-clock-history"></i> Your Payment History
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if payments %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Amount</th>
+                                            <th>Method</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for payment in payments %}
+                                        <tr>
+                                            <td>{{ payment.date.strftime('%m/%d/%Y') }}</td>
+                                            <td>
+                                                <strong class="text-success">${{ "%.2f"|format(payment.amount) }}</strong>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-secondary">{{ payment.payment_method }}</span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-check-circle"></i> Confirmed
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="bi bi-receipt text-muted" style="font-size: 3rem;"></i>
+                                <h5 class="text-muted mt-3">No payments recorded yet</h5>
+                                <p class="text-muted">Your payment history will appear here once you make payments.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Payment Schedule -->
+                {% if payment_schedule %}
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-calendar2-week"></i> Payment Schedule
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Due Date</th>
+                                        <th>Amount</th>
+                                        <th>Description</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for scheduled in payment_schedule %}
+                                    {% set due_date = scheduled.due_date if scheduled.due_date is string else scheduled.due_date %}
+                                    <tr class="{{ 'table-success' if scheduled.status == 'paid' else '' }}">
+                                        <td>{{ due_date[:10] if due_date else 'N/A' }}</td>
+                                        <td>${{ "%.2f"|format(scheduled.amount) }}</td>
+                                        <td>{{ scheduled.description }}</td>
+                                        <td>
+                                            {% if scheduled.status == 'paid' %}
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-check"></i> Paid
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-warning text-dark">
+                                                    <i class="bi bi-clock"></i> Due
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Quick Actions & Payment Plan -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-lightning-charge"></i> Quick Actions
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            {% if balance_due > 0 %}
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <strong>Outstanding Balance</strong><br>
+                                You have ${{ "%.2f"|format(balance_due) }} remaining to pay.
+                            </div>
+                            {% else %}
+                            <div class="alert alert-success">
+                                <i class="bi bi-check-circle"></i>
+                                <strong>Paid in Full!</strong><br>
+                                Great job staying current with your dues.
+                            </div>
+                            {% endif %}
+
+                            <button class="btn btn-primary" disabled>
+                                <i class="bi bi-credit-card"></i> Make Payment
+                                <small class="d-block">Coming Soon</small>
+                            </button>
+
+                            <button class="btn btn-outline-info" disabled>
+                                <i class="bi bi-calendar-plus"></i> Suggest Payment Plan
+                                <small class="d-block">Coming Soon</small>
+                            </button>
+
+                            <button class="btn btn-outline-secondary" disabled>
+                                <i class="bi bi-receipt"></i> Request Reimbursement
+                                <small class="d-block">Coming Soon</small>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Methods Info -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-info-circle"></i> Payment Methods
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-2"><strong>Accepted Payment Methods:</strong></p>
+                        <ul class="list-unstyled">
+                            <li><i class="bi bi-phone text-primary"></i> Zelle</li>
+                            <li><i class="bi bi-app text-info"></i> Venmo</li>
+                            <li><i class="bi bi-cash text-success"></i> Cash</li>
+                            <li><i class="bi bi-credit-card text-warning"></i> Check</li>
+                        </ul>
+                        <div class="alert alert-info mt-3">
+                            <small>
+                                <i class="bi bi-lightbulb"></i>
+                                <strong>Tip:</strong> Contact the treasurer for payment instructions or questions about your dues.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contact Info -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-person-vcard"></i> Your Information
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Name:</strong> {{ member.name }}</p>
+                        <p><strong>Contact:</strong> {{ member.contact }}</p>
+                        <p><strong>Payment Plan:</strong> 
+                            <span class="badge bg-primary">{{ member.payment_plan.title() }}</span>
+                        </p>
+                        {% if current_user.email %}
+                        <p><strong>Email:</strong> {{ current_user.email }}</p>
+                        {% endif %}
+                        
+                        <a href="{{ url_for('auth.profile') }}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-pencil"></i> Update Profile
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Auto-refresh balance every 5 minutes
+        setInterval(function() {
+            // Refresh page if not in focus to get updated balance
+            if (document.hidden) {
+                location.reload();
+            }
+        }, 300000);
+
+        // Show payment tips based on balance
+        {% if balance_due > 0 %}
+        setTimeout(function() {
+            if ({{ balance_due }} > 50) {
+                console.log('Consider setting up a payment plan to make dues more manageable!');
+            }
+        }, 3000);
+        {% endif %}
+    </script>
+</body>
+</html>

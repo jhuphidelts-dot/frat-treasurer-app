@@ -1,0 +1,56 @@
+<!-- Approve Modal -->
+<div class="modal fade" id="approveModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-check-circle"></i> Approve Spending Plan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to approve this spending plan?</p>
+                <div id="approveDetails"></div>
+                <div class="mt-3">
+                    <label for="approvalNotes" class="form-label">Approval Notes (Optional)</label>
+                    <textarea class="form-control" id="approvalNotes" rows="3" 
+                              placeholder="Add any notes or feedback for the officer..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmApprove">
+                    <i class="bi bi-check-circle"></i> Approve Plan
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-x-circle"></i> Reject Spending Plan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="rejectDetails" class="mb-3"></div>
+                <div class="mb-3">
+                    <label for="rejectionReason" class="form-label">Rejection Reason *</label>
+                    <textarea class="form-control" id="rejectionReason" rows="4" 
+                              placeholder="Please provide detailed feedback on why this plan is being rejected and suggestions for improvement..."></textarea>
+                </div>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> 
+                    The officer will be able to revise and resubmit their plan based on your feedback.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmReject">
+                    <i class="bi bi-x-circle"></i> Reject Plan
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dues Summary - Fraternity Treasurer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .member-card {
+            transition: transform 0.2s;
+        }
+        .member-card:hover {
+            transform: translateY(-2px);
+        }
+        .paid-up {
+            border-left: 4px solid #28a745;
+        }
+        .outstanding {
+            border-left: 4px solid #ffc107;
+        }
+        .overdue {
+            border-left: 4px solid #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1>📊 Dues Collection Summary</h1>
+                    <a href="/" class="btn btn-secondary">← Back to Dashboard</a>
+                </div>
+
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages() %}
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Overview Cards -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card bg-primary text-white">
+                            <div class="card-body text-center">
+                                <h3>${{ "%.2f"|format(dues_summary.total_projected) }}</h3>
+                                <p class="mb-0">Total Projected</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-success text-white">
+                            <div class="card-body text-center">
+                                <h3>${{ "%.2f"|format(dues_summary.total_collected) }}</h3>
+                                <p class="mb-0">Total Collected</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-warning text-white">
+                            <div class="card-body text-center">
+                                <h3>${{ "%.2f"|format(dues_summary.outstanding) }}</h3>
+                                <p class="mb-0">Outstanding</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-info text-white">
+                            <div class="card-body text-center">
+                                <h3>{{ "%.1f"|format(dues_summary.collection_rate) }}%</h3>
+                                <p class="mb-0">Collection Rate</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Collection Progress -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>Collection Progress</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="progress mb-3" style="height: 30px;">
+                            <div class="progress-bar bg-success" style="width: {{ dues_summary.collection_rate }}%">
+                                {{ "%.1f"|format(dues_summary.collection_rate) }}% Collected
+                            </div>
+                        </div>
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <h5>{{ dues_summary.members_paid_up }}</h5>
+                                <span class="badge bg-success">Paid Up Members</span>
+                            </div>
+                            <div class="col-4">
+                                <h5>{{ dues_summary.members_outstanding }}</h5>
+                                <span class="badge bg-warning">Outstanding Members</span>
+                            </div>
+                            <div class="col-4">
+                                <h5>{{ members|length }}</h5>
+                                <span class="badge bg-primary">Total Members</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chart Section -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>Collection Status Distribution</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="statusChart" width="400" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>Financial Overview</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="financialChart" width="400" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Member Status Breakdown -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Member Status Breakdown</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for member_id, member in members.items() %}
+                                {% set total_paid = member.payments_made|map(attribute='amount')|sum %}
+                                {% set balance = member.dues_amount - total_paid %}
+                                
+                                <div class="col-md-4 mb-3">
+                                    <div class="card member-card h-100 
+                                        {% if balance <= 0 %}paid-up
+                                        {% elif balance > 0 %}outstanding{% endif %}">
+                                        <div class="card-body">
+                                            <h6 class="card-title">
+                                                <a href="/member_details/{{ member_id }}" class="text-decoration-none">
+                                                    {{ member.name }}
+                                                </a>
+                                            </h6>
+                                            <p class="card-text">
+                                                <strong>Dues:</strong> ${{ "%.2f"|format(member.dues_amount) }}<br>
+                                                <strong>Paid:</strong> ${{ "%.2f"|format(total_paid) }}<br>
+                                                <strong>Balance:</strong> 
+                                                {% if balance <= 0 %}
+                                                    <span class="text-success">${{ "%.2f"|format(balance) }}</span>
+                                                {% else %}
+                                                    <span class="text-danger">${{ "%.2f"|format(balance) }}</span>
+                                                {% endif %}
+                                            </p>
+                                            <div class="progress mb-2" style="height: 10px;">
+                                                {% set payment_percentage = (total_paid / member.dues_amount * 100) if member.dues_amount > 0 else 0 %}
+                                                <div class="progress-bar 
+                                                    {% if payment_percentage >= 100 %}bg-success
+                                                    {% elif payment_percentage >= 75 %}bg-info
+                                                    {% elif payment_percentage >= 50 %}bg-warning
+                                                    {% else %}bg-danger{% endif %}" 
+                                                    style="width: {{ [payment_percentage, 100]|min }}%">
+                                                </div>
+                                            </div>
+                                            <small class="text-muted">
+                                                {{ "%.1f"|format(payment_percentage) }}% paid
+                                            </small>
+                                            {% if balance <= 0 %}
+                                                <span class="badge bg-success float-end">✓ Paid Up</span>
+                                            {% else %}
+                                                <span class="badge bg-warning float-end">Outstanding</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Status Chart
+        const statusCtx = document.getElementById('statusChart').getContext('2d');
+        new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Paid Up', 'Outstanding'],
+                datasets: [{
+                    data: [{{ dues_summary.members_paid_up }}, {{ dues_summary.members_outstanding }}],
+                    backgroundColor: ['#28a745', '#ffc107'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+
+        // Financial Chart
+        const financialCtx = document.getElementById('financialChart').getContext('2d');
+        new Chart(financialCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Projected', 'Collected', 'Outstanding'],
+                datasets: [{
+                    label: 'Amount ($)',
+                    data: [
+                        {{ dues_summary.total_projected }}, 
+                        {{ dues_summary.total_collected }}, 
+                        {{ dues_summary.outstanding }}
+                    ],
+                    backgroundColor: ['#007bff', '#28a745', '#ffc107'],
+                    borderColor: ['#0056b3', '#1e7e34', '#e0a800'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toFixed(2);
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

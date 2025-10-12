@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fraternity Treasurer Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .dashboard-card {
+            margin-bottom: 20px;
+        }
+        .budget-progress {
+            margin-bottom: 10px;
+        }
+        .overdue {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .paid-up {
+            color: #28a745;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="bi bi-bank2"></i> Fraternity Treasurer
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('transactions') }}">
+                            <i class="bi bi-list-ul"></i> All Transactions
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('monthly_income') }}">
+                            <i class="bi bi-calendar3"></i> Monthly Income
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('budget_management') }}">
+                            <i class="bi bi-wallet2"></i> Budget Management
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('dues_summary_page') }}">
+                            <i class="bi bi-graph-up"></i> Dues Summary
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('semester_management') }}">
+                            <i class="bi bi-calendar3"></i> Semesters
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('notifications.dashboard') }}">
+                            <i class="bi bi-bell"></i> Notifications
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i> {{ session.user }}
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('ai_assistant') }}">
+                                <i class="bi bi-robot"></i> AI Assistant
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('treasurer_setup') }}">
+                                <i class="bi bi-gear"></i> Treasurer Setup
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('change_password') }}">
+                                <i class="bi bi-key"></i> Change Password
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                                <i class="bi bi-box-arrow-right"></i> Logout
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="mb-4">Fraternity Treasurer Dashboard</h1>
+                
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages() %}
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+
+        <!-- Quick Stats Row -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Members</h5>
+                        <h2>{{ members|length }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Dues Collected</h5>
+                        <h2>${{ "%.2f"|format(dues_summary.total_collected) }}</h2>
+                        <small>{{ "%.1f"|format(dues_summary.collection_rate) }}% collected</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Projected Dues</h5>
+                        <h2>${{ "%.2f"|format(dues_summary.total_projected) }}</h2>
+                        <small>${{ "%.2f"|format(dues_summary.outstanding) }} outstanding</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Expenses</h5>
+                        {% set total_expenses = 0 %}
+                        {% for summary in budget_summary.values() %}
+                            {% set total_expenses = total_expenses + summary.spent %}
+                        {% endfor %}
+                        <h2>${{ "%.2f"|format(total_expenses) }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Member Management -->
+            <div class="col-lg-6">
+                <div class="card dashboard-card">
+                    <div class="card-header">
+                        <h5>Member Management</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6>Add New Member</h6>
+                            <a href="/bulk_import" class="btn btn-outline-primary btn-sm">
+                                📊 Bulk Import
+                            </a>
+                        </div>
+                        
+                        <!-- Add Member Form -->
+                        <form method="POST" action="/add_member" class="mb-4">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <input type="text" class="form-control mb-2" name="name" placeholder="Full Name" required>
+                                    <input type="text" class="form-control mb-2" name="contact" placeholder="Phone or Email" required>
+                                    <small class="text-muted">Enter phone number or email address for notifications</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <input type="number" class="form-control mb-2" name="dues_amount" placeholder="Dues Amount" step="0.01" required>
+                                    <select class="form-control mb-2" name="payment_plan" required>
+                                        <option value="">Select Payment Plan</option>
+                                        <option value="semester">Full Semester</option>
+                                        <option value="monthly">Monthly (4 payments)</option>
+                                        <option value="bimonthly">Bi-monthly (2 payments)</option>
+                                    </select>
+                                    <button type="submit" class="btn btn-primary">Add Member</button>
+                                </div>
+                            </div>
+                        </form>
+
+                        <!-- Members List -->
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Contact</th>
+                                        <th>Dues</th>
+                                        <th>Paid</th>
+                                        <th>Balance</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for member_id, member in members.items() %}
+                                    {% set total_paid = member.payments_made|map(attribute='amount')|sum %}
+                                    {% set balance = member.dues_amount - total_paid %}
+                                    <tr>
+                                        <td><a href="/member_details/{{ member_id }}" class="text-decoration-none">{{ member.name }}</a></td>
+                                        <td>
+                                            <span class="badge {% if member.contact_type == 'email' %}bg-info{% else %}bg-secondary{% endif %}">
+                                                {% if member.contact_type == 'email' %}<i class="bi bi-envelope"></i>{% else %}<i class="bi bi-phone"></i>{% endif %}
+                                            </span>
+                                            <small>{{ member.contact[:20] }}{% if member.contact|length > 20 %}...{% endif %}</small>
+                                        </td>
+                                        <td>${{ "%.2f"|format(member.dues_amount) }}</td>
+                                        <td>${{ "%.2f"|format(total_paid) }}</td>
+                                        <td>${{ "%.2f"|format(balance) }}</td>
+                                        <td>
+                                            {% if balance <= 0 %}
+                                                <span class="paid-up">Paid Up</span>
+                                            {% else %}
+                                                <span class="overdue">Owes ${{ "%.2f"|format(balance) }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <a href="/edit_member/{{ member_id }}" class="btn btn-outline-primary btn-sm" title="Edit">
+                                                    ✏️
+                                                </a>
+                                                <form method="POST" action="/remove_member/{{ member_id }}" class="d-inline" 
+                                                      onsubmit="return confirm('Are you sure you want to remove {{ member.name }}? This cannot be undone.')">
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Remove">
+                                                        🗑️
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Recording -->
+                <div class="card dashboard-card">
+                    <div class="card-header">
+                        <h5>Record Payment</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="/record_payment">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <select class="form-control mb-2" name="member_id" required>
+                                        <option value="">Select Member</option>
+                                        {% for member_id, member in members.items() %}
+                                            <option value="{{ member_id }}">{{ member.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <input type="number" class="form-control mb-2" name="amount" placeholder="Payment Amount" step="0.01" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <select class="form-control mb-2" name="payment_method" required>
+                                        <option value="">Payment Method</option>
+                                        <option value="Zelle">Zelle</option>
+                                        <option value="Venmo">Venmo</option>
+                                        <option value="Cash">Cash</option>
+                                        <option value="Check">Check</option>
+                                    </select>
+                                    <button type="submit" class="btn btn-success">Record Payment</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Budget Tracking -->
+            <div class="col-lg-6">
+                <div class="card dashboard-card">
+                    <div class="card-header">
+                        <h5>Budget Overview</h5>
+                    </div>
+                    <div class="card-body">
+                        {% for category, summary in budget_summary.items() %}
+                        <div class="budget-progress">
+                            <div class="d-flex justify-content-between">
+                                <small><strong>{{ category }}</strong></small>
+                                <small>${{ "%.2f"|format(summary.spent) }} / ${{ "%.2f"|format(summary.budget_limit) }}</small>
+                            </div>
+                            <div class="progress mb-1" style="height: 10px;">
+                                <div class="progress-bar 
+                                    {% if summary.percent_used > 90 %}bg-danger
+                                    {% elif summary.percent_used > 70 %}bg-warning
+                                    {% else %}bg-success{% endif %}" 
+                                    style="width: {{ summary.percent_used }}%"></div>
+                            </div>
+                            <small class="text-muted">{{ "%.1f"|format(summary.percent_used) }}% used, ${{ "%.2f"|format(summary.remaining) }} remaining</small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Add Transaction -->
+                <div class="card dashboard-card">
+                    <div class="card-header">
+                        <h5>Add Transaction</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="/add_transaction">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <select class="form-control mb-2" name="category" required>
+                                        <option value="">Select Category</option>
+                                        {% for category in categories %}
+                                            <option value="{{ category }}">{{ category }}</option>
+                                        {% endfor %}
+                                        <option value="Dues Collection">Dues Collection</option>
+                                    </select>
+                                    <input type="text" class="form-control mb-2" name="description" placeholder="Description" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <input type="number" class="form-control mb-2" name="amount" placeholder="Amount" step="0.01" required>
+                                    <select class="form-control mb-2" name="type" required>
+                                        <option value="">Transaction Type</option>
+                                        <option value="expense">Expense</option>
+                                        <option value="income">Income</option>
+                                    </select>
+                                    <button type="submit" class="btn btn-primary">Add Transaction</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <a href="/send_reminders" class="btn btn-warning me-2">
+                            <i class="bi bi-bell"></i> Send All Reminders
+                        </a>
+                        <a href="{{ url_for('selective_reminders') }}" class="btn btn-outline-warning me-2">
+                            <i class="bi bi-bell-slash"></i> Selective Reminders
+                        </a>
+                        <a href="/monthly_income" class="btn btn-info me-2">
+                            <i class="bi bi-calendar3"></i> Monthly Income
+                        </a>
+                        <a href="/budget_management" class="btn btn-primary me-2">
+                            <i class="bi bi-wallet2"></i> Manage Budgets
+                        </a>
+                        <a href="/dues_summary" class="btn btn-success me-2">
+                            <i class="bi bi-graph-up"></i> Dues Summary
+                        </a>
+                        <a href="{{ url_for('export_to_sheet') }}" class="btn btn-success me-2">
+                            <i class="bi bi-cloud-upload"></i> Export Data to Google Sheet
+                        </a>
+                        <a href="/budget_summary" class="btn btn-outline-secondary" target="_blank">
+                            <i class="bi bi-file-earmark-bar-graph"></i> Detailed Budget Report
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function syncToSheets() {
+            // This would trigger a sync - for now just show a message
+            alert('Syncing to Google Sheets... (This requires API setup)');
+        }
+
+        // Auto-refresh budget data every 5 minutes
+        setInterval(function() {
+            fetch('/budget_summary')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Budget data refreshed', data);
+                    // You could update the UI here if needed
+                });
+        }, 300000); // 5 minutes
+    </script>
+</body>
+</html>

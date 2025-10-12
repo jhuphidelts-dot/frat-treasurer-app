@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Submit Reimbursement Request{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="bi bi-receipt"></i> Submit Reimbursement Request</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data" id="reimbursementForm">
+                        
+                        <!-- Budget Selection -->
+                        <div class="mb-3">
+                            <label for="budget_id" class="form-label">Budget Category *</label>
+                            <select class="form-select" id="budget_id" name="budget_id" required>
+                                <option value="">Select budget category...</option>
+                                {% for budget in budgets %}
+                                <option value="{{ budget.id }}" data-allocated="{{ budget.amount }}" 
+                                        data-spent="0" data-remaining="{{ budget.amount }}">
+                                    {{ budget.category }} - ${{ "{:,.2f}".format(budget.amount) }} available
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Select the budget category this expense should be charged to.</div>
+                        </div>
+
+                        <!-- Amount -->
+                        <div class="mb-3">
+                            <label for="amount" class="form-label">Amount *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="amount" name="amount" 
+                                       step="0.01" min="0.01" max="10000" required>
+                            </div>
+                            <div class="form-text">Enter the amount to be reimbursed.</div>
+                            <div id="amountWarning" class="alert alert-warning d-none mt-2">
+                                <i class="bi bi-exclamation-triangle"></i> 
+                                This amount exceeds the remaining budget for the selected category.
+                            </div>
+                        </div>
+
+                        <!-- Description -->
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description *</label>
+                            <textarea class="form-control" id="description" name="description" 
+                                      rows="3" maxlength="500" required></textarea>
+                            <div class="form-text">
+                                Provide a detailed description of the expense (max 500 characters).
+                                <span id="charCount" class="float-end">0/500</span>
+                            </div>
+                        </div>
+
+                        <!-- Expense Date -->
+                        <div class="mb-3">
+                            <label for="expense_date" class="form-label">Expense Date *</label>
+                            <input type="date" class="form-control" id="expense_date" name="expense_date" required>
+                            <div class="form-text">Date when the expense occurred.</div>
+                        </div>
+
+                        <!-- Receipt Upload -->
+                        <div class="mb-3">
+                            <label for="receipt" class="form-label">Receipt</label>
+                            <input type="file" class="form-control" id="receipt" name="receipt" 
+                                   accept=".pdf,.png,.jpg,.jpeg,.gif,.heic">
+                            <div class="form-text">
+                                Upload a receipt image or PDF (optional but recommended). 
+                                Max file size: 5MB. Supported formats: PDF, PNG, JPG, JPEG, GIF, HEIC.
+                            </div>
+                            <div id="filePreview" class="mt-2 d-none">
+                                <div class="alert alert-info">
+                                    <i class="bi bi-file-earmark"></i>
+                                    <span id="fileName"></span>
+                                    <span id="fileSize" class="text-muted"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Priority (for admins/chairs) -->
+                        {% if has_permission('manage_own_budget') %}
+                        <div class="mb-3">
+                            <label for="priority" class="form-label">Priority</label>
+                            <select class="form-select" id="priority" name="priority">
+                                <option value="normal">Normal</option>
+                                <option value="high">High</option>
+                                <option value="urgent">Urgent</option>
+                            </select>
+                            <div class="form-text">Set the priority level for this request.</div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Submit Buttons -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('reimbursement.list_reimbursements') }}" 
+                               class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary" id="submitBtn">
+                                <i class="bi bi-check-circle"></i> Submit Request
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const budgetSelect = document.getElementById('budget_id');
+    const amountInput = document.getElementById('amount');
+    const amountWarning = document.getElementById('amountWarning');
+    const descriptionTextarea = document.getElementById('description');
+    const charCount = document.getElementById('charCount');
+    const receiptInput = document.getElementById('receipt');
+    const filePreview = document.getElementById('filePreview');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    // Set max date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('expense_date').max = today;
+    document.getElementById('expense_date').value = today;
+    
+    // Character counter for description
+    descriptionTextarea.addEventListener('input', function() {
+        const count = this.value.length;
+        charCount.textContent = count + '/500';
+        if (count > 450) {
+            charCount.classList.add('text-warning');
+        } else {
+            charCount.classList.remove('text-warning');
+        }
+    });
+    
+    // Budget and amount validation
+    function checkBudget() {
+        const selectedOption = budgetSelect.options[budgetSelect.selectedIndex];
+        const amount = parseFloat(amountInput.value);
+        
+        if (selectedOption && amount && selectedOption.dataset.remaining) {
+            const remaining = parseFloat(selectedOption.dataset.remaining);
+            if (amount > remaining) {
+                amountWarning.classList.remove('d-none');
+            } else {
+                amountWarning.classList.add('d-none');
+            }
+        } else {
+            amountWarning.classList.add('d-none');
+        }
+    }
+    
+    budgetSelect.addEventListener('change', checkBudget);
+    amountInput.addEventListener('input', checkBudget);
+    
+    // File upload preview
+    receiptInput.addEventListener('change', function() {
+        const file = this.files[0];
+        if (file) {
+            const maxSize = 5 * 1024 * 1024; // 5MB
+            if (file.size > maxSize) {
+                alert('File size must be less than 5MB');
+                this.value = '';
+                filePreview.classList.add('d-none');
+                return;
+            }
+            
+            fileName.textContent = file.name;
+            fileSize.textContent = '(' + (file.size / 1024).toFixed(1) + ' KB)';
+            filePreview.classList.remove('d-none');
+        } else {
+            filePreview.classList.add('d-none');
+        }
+    });
+    
+    // Form submission
+    document.getElementById('reimbursementForm').addEventListener('submit', function(e) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="spinner-border spinner-border-sm me-2"></i>Submitting...';
+    });
+    
+    // Form validation
+    function validateForm() {
+        const budget = budgetSelect.value;
+        const amount = amountInput.value;
+        const description = descriptionTextarea.value.trim();
+        const expenseDate = document.getElementById('expense_date').value;
+        
+        const isValid = budget && amount && description && expenseDate;
+        submitBtn.disabled = !isValid;
+        
+        return isValid;
+    }
+    
+    [budgetSelect, amountInput, descriptionTextarea, document.getElementById('expense_date')]
+        .forEach(input => input.addEventListener('input', validateForm));
+    
+    // Initial validation
+    validateForm();
+});
+</script>
+{% endblock %}

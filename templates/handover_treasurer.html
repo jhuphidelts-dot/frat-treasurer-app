@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Treasurer Handover - Fraternity Treasurer App</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h1><i class="fas fa-user-check text-warning"></i> Treasurer Handover</h1>
+        <p class="text-muted">Prepare the app for transfer to the new treasurer.</p>
+
+        <div class="alert alert-warning">
+            <h5><i class="fas fa-exclamation-triangle"></i> Important Notice</h5>
+            <p>This process will:</p>
+            <ul>
+                <li>Clear all your personal credentials and contact information</li>
+                <li>Archive the current semester</li>
+                <li>Preserve all member data, transactions, and budgets</li>
+                <li>Generate setup instructions for the new treasurer</li>
+            </ul>
+            <p><strong>This action cannot be undone. Make sure you have completed all necessary tasks for this semester.</strong></p>
+        </div>
+
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-list-check"></i> Handover Checklist</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="check1">
+                            <label class="form-check-label" for="check1">
+                                All pending dues have been collected or recorded
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="check2">
+                            <label class="form-check-label" for="check2">
+                                All transactions for this semester have been entered
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="check3">
+                            <label class="form-check-label" for="check3">
+                                Budget limits and spending have been reviewed
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="check4">
+                            <label class="form-check-label" for="check4">
+                                Financial reports have been generated and saved
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="check5">
+                            <label class="form-check-label" for="check5">
+                                Data has been backed up to Google Sheets (if configured)
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="check6">
+                            <label class="form-check-label" for="check6">
+                                New treasurer has been identified and is ready to take over
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5><i class="fas fa-book"></i> Setup Instructions for New Treasurer</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <h6>Instructions to provide to the new treasurer:</h6>
+                            <ol>
+                                <li>Open the app using the "Start Treasurer App.command" file</li>
+                                <li>Login with username: <code>admin</code> and password: <code>admin123</code></li>
+                                <li>Go to "Treasurer Setup" to configure your personal information</li>
+                                <li>Set up your Gmail App Password for email notifications</li>
+                                <li>Configure Twilio (optional) for SMS notifications</li>
+                                <li>Set up Google Sheets integration (optional) for data backup</li>
+                                <li>Create a new semester for the upcoming term</li>
+                                <li>Change the admin password in the settings</li>
+                            </ol>
+                        </div>
+                        <button class="btn btn-outline-primary" onclick="copyInstructions()">
+                            <i class="fas fa-copy"></i> Copy Instructions
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-download"></i> Export Data</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">Export current data before handover:</p>
+                        <div class="d-grid gap-2">
+                            <a href="/export_to_sheet" class="btn btn-outline-success">
+                                <i class="fab fa-google"></i> Export to Google Sheets
+                            </a>
+                            <button class="btn btn-outline-info" onclick="downloadData()">
+                                <i class="fas fa-file-download"></i> Download JSON Backup
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header text-bg-danger">
+                        <h5><i class="fas fa-handshake"></i> Complete Handover</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">Once all checks are complete:</p>
+                        <form method="POST" onsubmit="return confirmHandover()">
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-danger" id="handoverBtn" disabled>
+                                    <i class="fas fa-user-check"></i> Complete Handover
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Enable handover button only when all checks are completed
+        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        const handoverBtn = document.getElementById('handoverBtn');
+        
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+                handoverBtn.disabled = !allChecked;
+            });
+        });
+
+        function confirmHandover() {
+            return confirm('Are you sure you want to complete the handover? This will clear all your personal information and archive the current semester.');
+        }
+
+        function copyInstructions() {
+            const instructions = `Instructions for New Treasurer:
+1. Open the app using the "Start Treasurer App.command" file
+2. Login with username: admin and password: admin123
+3. Go to "Treasurer Setup" to configure your personal information
+4. Set up your Gmail App Password for email notifications
+5. Configure Twilio (optional) for SMS notifications
+6. Set up Google Sheets integration (optional) for data backup
+7. Create a new semester for the upcoming term
+8. Change the admin password in the settings`;
+            
+            navigator.clipboard.writeText(instructions).then(() => {
+                alert('Instructions copied to clipboard!');
+            });
+        }
+
+        function downloadData() {
+            // Create a data export
+            window.location.href = '/export_data';
+        }
+    </script>
+</body>
+</html>

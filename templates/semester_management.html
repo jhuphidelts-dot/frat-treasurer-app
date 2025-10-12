@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Semester Management</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h1><i class="fas fa-calendar-alt"></i> Semester Management</h1>
+
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-info alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Create New Semester</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="mb-3">
+                                <label class="form-label">Season</label>
+                                <select name="season" class="form-control" required>
+                                    <option value="Spring">Spring</option>
+                                    <option value="Summer">Summer</option>
+                                    <option value="Fall" selected>Fall</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Year</label>
+                                <input type="number" name="year" class="form-control" 
+                                       value="{{ current_semester.year + 1 if current_semester else 2025 }}" 
+                                       min="2020" max="2030" required>
+                            </div>
+                            <button type="submit" class="btn btn-success" 
+                                    onclick="return confirm('This will archive the current semester. Continue?')">
+                                <i class="fas fa-plus"></i> Create Semester
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>All Semesters</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="list-group">
+                            {% for semester in semesters %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ semester.name }}</strong>
+                                    {% if semester.is_current %}
+                                        <span class="badge bg-success ms-2">Current</span>
+                                    {% elif semester.archived %}
+                                        <span class="badge bg-secondary ms-2">Archived</span>
+                                    {% endif %}
+                                </div>
+                                <small class="text-muted">
+                                    {% if semester.start_date %}
+                                        {{ semester.start_date[:10] }}
+                                    {% endif %}
+                                </small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+            <a href="{{ url_for('export_improved_sheets') }}" class="btn btn-primary">
+                <i class="fas fa-file-export"></i> Export Current Semester
+            </a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

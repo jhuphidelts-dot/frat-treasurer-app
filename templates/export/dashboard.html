@@ -1,0 +1,594 @@
+{% extends "base.html" %}
+{% block title %}Data Export Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2">
+                <i class="bi bi-download"></i>
+                Data Export Dashboard
+            </h1>
+            <p class="text-muted mb-0">Export fraternity data in multiple formats with advanced filtering</p>
+        </div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                <li class="breadcrumb-item active">Export</li>
+            </ol>
+        </nav>
+    </div>
+
+    <!-- Export Form -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card feature-card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-gear"></i>
+                        Export Configuration
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="exportForm">
+                        <!-- Export Type Selection -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <select class="form-select" id="exportType" name="export_type" required>
+                                        <option value="">Choose Data Type</option>
+                                        {% for key, name in export_types.items() %}
+                                            <option value="{{ key }}">{{ name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <label for="exportType">Data Type to Export</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <select class="form-select" id="format" name="format" required>
+                                        <option value="">Choose Format</option>
+                                        {% for format in supported_formats %}
+                                            <option value="{{ format }}">{{ format.upper() }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <label for="format">Export Format</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Filters Section -->
+                        <div class="collapsible-section" id="filtersSection">
+                            <div class="collapsible-header">
+                                <span class="fw-semibold">
+                                    <i class="bi bi-funnel"></i>
+                                    Advanced Filters
+                                </span>
+                            </div>
+                            <div class="collapsible-content">
+                                <div class="row g-3">
+                                    <!-- Date Range -->
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <input type="date" class="form-control date-picker" id="startDate" name="start_date">
+                                            <label for="startDate">Start Date</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <input type="date" class="form-control date-picker" id="endDate" name="end_date">
+                                            <label for="endDate">End Date</label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Semester Filter -->
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <select class="form-select" id="semester" name="semester_id">
+                                                <option value="">All Semesters</option>
+                                                {% for semester in semesters %}
+                                                    <option value="{{ semester.id }}" 
+                                                            {{ 'selected' if semester.is_current else '' }}>
+                                                        {{ semester.name }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                            <label for="semester">Semester</label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Category Filter (for transactions) -->
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <select class="form-select" id="category" name="category">
+                                                <option value="">All Categories</option>
+                                                <option value="Executive(GHQ, IFC, Flights)">Executive</option>
+                                                <option value="Brotherhood">Brotherhood</option>
+                                                <option value="Social">Social</option>
+                                                <option value="Philanthropy">Philanthropy</option>
+                                                <option value="Recruitment">Recruitment</option>
+                                                <option value="Phi ED">Phi ED</option>
+                                                <option value="Housing">Housing</option>
+                                                <option value="Bank Maintenance">Bank Maintenance</option>
+                                                <option value="Dues Collection">Dues Collection</option>
+                                            </select>
+                                            <label for="category">Category</label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Payment Status (for members) -->
+                                    <div class="col-md-6" id="paymentStatusFilter" style="display: none;">
+                                        <div class="form-floating">
+                                            <select class="form-select" id="paymentStatus" name="payment_status">
+                                                <option value="">All Members</option>
+                                                <option value="paid">Fully Paid</option>
+                                                <option value="partial">Partially Paid</option>
+                                                <option value="overdue">Overdue</option>
+                                            </select>
+                                            <label for="paymentStatus">Payment Status</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Quick Date Presets -->
+                                <div class="mt-3">
+                                    <label class="form-label fw-semibold">Quick Date Ranges:</label>
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="setDateRange('thisMonth')">
+                                            This Month
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="setDateRange('lastMonth')">
+                                            Last Month
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="setDateRange('thisYear')">
+                                            This Year
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="setDateRange('lastYear')">
+                                            Last Year
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-flex gap-3 mt-4">
+                            <button type="button" class="btn btn-outline-info btn-icon" onclick="previewExport()" id="previewBtn">
+                                <i class="bi bi-eye"></i>
+                                Preview Data
+                            </button>
+                            <button type="submit" class="btn btn-gradient-primary btn-icon" data-loading-button id="exportBtn">
+                                <i class="bi bi-download"></i>
+                                <span class="btn-text">Export Data</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Information Panel -->
+        <div class="col-lg-4">
+            <div class="card feature-card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle"></i>
+                        Export Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="exportInfo" class="text-center text-muted">
+                        <i class="bi bi-file-earmark-arrow-down fa-3x mb-3"></i>
+                        <p>Select an export type to see details</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Format Guide -->
+            <div class="card feature-card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-question-circle"></i>
+                        Format Guide
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="format-guide">
+                        <div class="format-item mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="format-icon bg-success text-white rounded me-2">
+                                    <i class="bi bi-file-earmark-spreadsheet"></i>
+                                </div>
+                                <div>
+                                    <strong>CSV</strong>
+                                    <small class="d-block text-muted">Simple, compatible with Excel</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="format-item mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="format-icon bg-primary text-white rounded me-2">
+                                    <i class="bi bi-file-earmark-excel"></i>
+                                </div>
+                                <div>
+                                    <strong>Excel</strong>
+                                    <small class="d-block text-muted">Formatted spreadsheet with charts</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="format-item mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="format-icon bg-danger text-white rounded me-2">
+                                    <i class="bi bi-file-earmark-pdf"></i>
+                                </div>
+                                <div>
+                                    <strong>PDF</strong>
+                                    <small class="d-block text-muted">Professional report format</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="format-item">
+                            <div class="d-flex align-items-center">
+                                <div class="format-icon bg-warning text-white rounded me-2">
+                                    <i class="bi bi-file-earmark-code"></i>
+                                </div>
+                                <div>
+                                    <strong>JSON</strong>
+                                    <small class="d-block text-muted">Raw data for developers</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Preview Modal -->
+    <div class="modal fade" id="previewModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-eye"></i>
+                        Data Preview
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="previewContent">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading preview...</span>
+                            </div>
+                            <p class="mt-2">Loading preview...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="exportAfterPreview()">
+                        <i class="bi bi-download"></i>
+                        Export This Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.format-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+}
+
+.export-type-info {
+    padding: 1rem;
+    border-left: 4px solid #007bff;
+    background-color: #f8f9fa;
+    border-radius: 0 0.375rem 0.375rem 0;
+}
+
+.preview-table {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.preview-summary {
+    background-color: #e3f2fd;
+    padding: 1rem;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+}
+</style>
+
+<script>
+// Export type descriptions
+const exportTypeInfo = {
+    'members': {
+        title: 'Member Data Export',
+        description: 'Complete member information including dues, payments, and contact details.',
+        fields: ['Name', 'Contact Info', 'Dues Amount', 'Balance', 'Payment Plan', 'Status'],
+        filters: ['Payment Status', 'Semester']
+    },
+    'transactions': {
+        title: 'Transaction History',
+        description: 'All financial transactions with categories and amounts.',
+        fields: ['Date', 'Category', 'Description', 'Amount', 'Type'],
+        filters: ['Date Range', 'Category']
+    },
+    'financial_summary': {
+        title: 'Financial Summary Report',
+        description: 'Comprehensive financial overview with totals and analysis.',
+        fields: ['Dues Summary', 'Budget Breakdown', 'Transaction Totals'],
+        filters: ['Semester']
+    },
+    'reimbursements': {
+        title: 'Reimbursement Requests',
+        description: 'All reimbursement requests with status and approval information.',
+        fields: ['Date', 'Requester', 'Amount', 'Category', 'Status'],
+        filters: ['Date Range', 'Status']
+    },
+    'spending_plans': {
+        title: 'Spending Plans',
+        description: 'Submitted spending plans with approval status and budget details.',
+        fields: ['Title', 'Category', 'Budget', 'Status', 'Created By'],
+        filters: ['Semester', 'Status']
+    },
+    'semester_report': {
+        title: 'Complete Semester Report',
+        description: 'Comprehensive report including all data for a specific semester.',
+        fields: ['All member, transaction, and financial data'],
+        filters: ['Semester']
+    }
+};
+
+// Initialize form behavior
+document.addEventListener('DOMContentLoaded', function() {
+    const exportTypeSelect = document.getElementById('exportType');
+    const paymentStatusFilter = document.getElementById('paymentStatusFilter');
+    
+    // Update info panel when export type changes
+    exportTypeSelect.addEventListener('change', function() {
+        updateExportInfo(this.value);
+        toggleFilters(this.value);
+    });
+    
+    // Form submission
+    document.getElementById('exportForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        generateExport();
+    });
+});
+
+function updateExportInfo(exportType) {
+    const infoDiv = document.getElementById('exportInfo');
+    
+    if (!exportType || !exportTypeInfo[exportType]) {
+        infoDiv.innerHTML = `
+            <i class="bi bi-file-earmark-arrow-down fa-3x mb-3"></i>
+            <p>Select an export type to see details</p>
+        `;
+        return;
+    }
+    
+    const info = exportTypeInfo[exportType];
+    infoDiv.innerHTML = `
+        <div class="export-type-info">
+            <h6 class="fw-bold">${info.title}</h6>
+            <p class="mb-3">${info.description}</p>
+            
+            <div class="mb-2">
+                <strong>Included Fields:</strong>
+                <ul class="list-unstyled mt-1">
+                    ${info.fields.map(field => `<li><small><i class="bi bi-check-circle text-success me-1"></i>${field}</small></li>`).join('')}
+                </ul>
+            </div>
+            
+            <div>
+                <strong>Available Filters:</strong>
+                <div class="mt-1">
+                    ${info.filters.map(filter => `<span class="badge bg-secondary me-1">${filter}</span>`).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function toggleFilters(exportType) {
+    const paymentStatusFilter = document.getElementById('paymentStatusFilter');
+    
+    // Show/hide payment status filter for member exports
+    if (exportType === 'members') {
+        paymentStatusFilter.style.display = 'block';
+    } else {
+        paymentStatusFilter.style.display = 'none';
+    }
+}
+
+function setDateRange(range) {
+    const startDate = document.getElementById('startDate');
+    const endDate = document.getElementById('endDate');
+    const today = new Date();
+    
+    switch(range) {
+        case 'thisMonth':
+            startDate.value = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+            endDate.value = today.toISOString().split('T')[0];
+            break;
+        case 'lastMonth':
+            const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+            startDate.value = lastMonth.toISOString().split('T')[0];
+            endDate.value = lastMonthEnd.toISOString().split('T')[0];
+            break;
+        case 'thisYear':
+            startDate.value = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+            endDate.value = today.toISOString().split('T')[0];
+            break;
+        case 'lastYear':
+            startDate.value = new Date(today.getFullYear() - 1, 0, 1).toISOString().split('T')[0];
+            endDate.value = new Date(today.getFullYear() - 1, 11, 31).toISOString().split('T')[0];
+            break;
+    }
+}
+
+function previewExport() {
+    const exportType = document.getElementById('exportType').value;
+    if (!exportType) {
+        EnhancedUI.showToast('Please select an export type first', 'warning');
+        return;
+    }
+    
+    const filters = getFilters();
+    
+    // Show loading in modal
+    const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+    modal.show();
+    
+    // Make preview request
+    fetch('{{ url_for("export.preview_export") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content')
+        },
+        body: JSON.stringify({
+            export_type: exportType,
+            filters: filters
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        displayPreview(data);
+    })
+    .catch(error => {
+        document.getElementById('previewContent').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i>
+                Error loading preview: ${error.message}
+            </div>
+        `;
+    });
+}
+
+function displayPreview(data) {
+    let html = `
+        <div class="preview-summary">
+            <h6><i class="bi bi-info-circle"></i> ${data.title}</h6>
+            <div class="row">
+                <div class="col-md-6">
+                    <strong>Total Records:</strong> ${data.total_records || data.data?.length || 0}
+                </div>
+                <div class="col-md-6">
+                    <strong>Generated:</strong> ${new Date(data.generated_at).toLocaleString()}
+                </div>
+            </div>
+            ${data.date_range ? `<div><strong>Date Range:</strong> ${data.date_range}</div>` : ''}
+            ${data.preview_note ? `<div class="text-warning"><small><i class="bi bi-info"></i> ${data.preview_note}</small></div>` : ''}
+        </div>
+    `;
+    
+    if (data.data && data.data.length > 0) {
+        // Create table
+        const headers = Object.keys(data.data[0]);
+        html += `
+            <div class="table-responsive preview-table">
+                <table class="table table-sm table-striped">
+                    <thead class="table-dark">
+                        <tr>
+                            ${headers.map(h => `<th>${h}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.data.map(row => `
+                            <tr>
+                                ${headers.map(h => `<td>${row[h] || ''}</td>`).join('')}
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    } else {
+        html += '<div class="alert alert-info">No data found matching your criteria.</div>';
+    }
+    
+    // Show summary if available
+    if (data.summary) {
+        html += '<div class="mt-3"><h6>Summary Information:</h6>';
+        html += '<div class="row">';
+        for (const [key, value] of Object.entries(data.summary)) {
+            if (typeof value === 'object') {
+                html += `<div class="col-md-6 mb-2">
+                    <strong>${key.replace('_', ' ')}:</strong>
+                    <ul class="small mb-0">
+                        ${Object.entries(value).map(([k, v]) => `<li>${k}: ${v}</li>`).join('')}
+                    </ul>
+                </div>`;
+            } else {
+                html += `<div class="col-md-6 mb-2">
+                    <strong>${key.replace('_', ' ')}:</strong> ${value}
+                </div>`;
+            }
+        }
+        html += '</div></div>';
+    }
+    
+    document.getElementById('previewContent').innerHTML = html;
+}
+
+function getFilters() {
+    return {
+        start_date: document.getElementById('startDate').value,
+        end_date: document.getElementById('endDate').value,
+        semester_id: document.getElementById('semester').value,
+        category: document.getElementById('category').value,
+        payment_status: document.getElementById('paymentStatus').value
+    };
+}
+
+function generateExport() {
+    const formData = new FormData(document.getElementById('exportForm'));
+    
+    // Create temporary form to submit for download
+    const tempForm = document.createElement('form');
+    tempForm.method = 'POST';
+    tempForm.action = '{{ url_for("export.generate_export") }}';
+    tempForm.style.display = 'none';
+    
+    // Copy form data
+    for (let [key, value] of formData.entries()) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = value;
+        tempForm.appendChild(input);
+    }
+    
+    document.body.appendChild(tempForm);
+    tempForm.submit();
+    document.body.removeChild(tempForm);
+    
+    EnhancedUI.showToast('Export started! Download will begin shortly.', 'success');
+}
+
+function exportAfterPreview() {
+    // Close modal and trigger export
+    bootstrap.Modal.getInstance(document.getElementById('previewModal')).hide();
+    generateExport();
+}
+</script>
+{% endblock %}

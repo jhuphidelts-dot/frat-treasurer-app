@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Send Selective Reminders - Fraternity Treasurer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .member-card {
+            border-left: 4px solid #ffc107;
+            transition: all 0.3s ease;
+        }
+        .member-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .member-card.selected {
+            border-left-color: #28a745;
+            background-color: #f8f9fa;
+        }
+        .balance-amount {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="bi bi-bank2"></i> Fraternity Treasurer
+            </a>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1><i class="bi bi-bell"></i> Send Payment Reminders</h1>
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">← Back to Dashboard</a>
+                </div>
+
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages() %}
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                {% if members_with_balance %}
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>Select Members to Send Reminders To</h5>
+                            <small class="text-muted">Only members with outstanding balances are shown</small>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST">
+                                <div class="mb-3">
+                                    <button type="button" class="btn btn-outline-primary btn-sm me-2" onclick="selectAll()">
+                                        Select All
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearAll()">
+                                        Clear All
+                                    </button>
+                                </div>
+                                
+                                <div class="row">
+                                    {% for item in members_with_balance %}
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card member-card">
+                                            <div class="card-body">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" 
+                                                           name="selected_members" value="{{ item.id }}" 
+                                                           id="member_{{ item.id }}" 
+                                                           onchange="toggleCard(this)">
+                                                    <label class="form-check-label w-100" for="member_{{ item.id }}">
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <div>
+                                                                <h6 class="mb-1">{{ item.member.name }}</h6>
+                                                                <div class="d-flex align-items-center">
+                                                                    <span class="badge {% if item.member.contact_type == 'email' %}bg-info{% else %}bg-secondary{% endif %} me-2">
+                                                                        {% if item.member.contact_type == 'email' %}
+                                                                            <i class="bi bi-envelope"></i>
+                                                                        {% else %}
+                                                                            <i class="bi bi-phone"></i>
+                                                                        {% endif %}
+                                                                    </span>
+                                                                    <small class="text-muted">{{ item.member.contact[:25] }}{% if item.member.contact|length > 25 %}...{% endif %}</small>
+                                                                </div>
+                                                            </div>
+                                                            <div class="text-end">
+                                                                <div class="balance-amount">${{ "%.2f"|format(item.balance) }}</div>
+                                                                <small class="text-muted">owed</small>
+                                                            </div>
+                                                        </div>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center mt-4">
+                                    <div>
+                                        <span id="selectedCount">0</span> member(s) selected
+                                    </div>
+                                    <div>
+                                        <button type="submit" class="btn btn-warning btn-lg">
+                                            <i class="bi bi-bell"></i> Send Reminders to Selected Members
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <div class="alert alert-info">
+                            <h6><i class="bi bi-info-circle"></i> Reminder Message Preview</h6>
+                            <p class="mb-0"><strong>For overdue members:</strong> "Hi [Name], your fraternity dues of $[Amount] are [X] days overdue. Please pay via Zelle or Venmo ASAP. Contact treasurer if you need help."</p>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="alert alert-success">
+                        <h5><i class="bi bi-check-circle"></i> All Members Paid Up!</h5>
+                        <p class="mb-0">No members currently have outstanding balances. All payment reminders are up to date!</p>
+                    </div>
+                    <div class="text-center mt-3">
+                        <a href="{{ url_for('index') }}" class="btn btn-primary">Return to Dashboard</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function selectAll() {
+            const checkboxes = document.querySelectorAll('input[name="selected_members"]');
+            checkboxes.forEach(cb => {
+                cb.checked = true;
+                toggleCard(cb);
+            });
+            updateSelectedCount();
+        }
+
+        function clearAll() {
+            const checkboxes = document.querySelectorAll('input[name="selected_members"]');
+            checkboxes.forEach(cb => {
+                cb.checked = false;
+                toggleCard(cb);
+            });
+            updateSelectedCount();
+        }
+
+        function toggleCard(checkbox) {
+            const card = checkbox.closest('.member-card');
+            if (checkbox.checked) {
+                card.classList.add('selected');
+            } else {
+                card.classList.remove('selected');
+            }
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            const checkedBoxes = document.querySelectorAll('input[name="selected_members"]:checked');
+            document.getElementById('selectedCount').textContent = checkedBoxes.length;
+        }
+
+        // Initialize count on page load
+        document.addEventListener('DOMContentLoaded', updateSelectedCount);
+    </script>
+</body>
+</html>

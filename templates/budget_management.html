@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budget Management - Fraternity Treasurer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .budget-category {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .budget-category.over-budget {
+            border-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        .budget-category.warning {
+            border-color: #ffc107;
+            background-color: #fff3cd;
+        }
+        .budget-category.good {
+            border-color: #28a745;
+            background-color: #d1f2eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1>Budget Management</h1>
+                    <a href="/" class="btn btn-secondary">← Back to Dashboard</a>
+                </div>
+
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages() %}
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Dues Collection Summary -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>📊 Dues Collection Overview</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4 class="text-primary">${{ "%.2f"|format(dues_summary.total_projected) }}</h4>
+                                    <small class="text-muted">Total Projected</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4 class="text-success">${{ "%.2f"|format(dues_summary.total_collected) }}</h4>
+                                    <small class="text-muted">Total Collected</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4 class="text-warning">${{ "%.2f"|format(dues_summary.outstanding) }}</h4>
+                                    <small class="text-muted">Outstanding</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4 class="text-info">{{ "%.1f"|format(dues_summary.collection_rate) }}%</h4>
+                                    <small class="text-muted">Collection Rate</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="progress mt-3" style="height: 20px;">
+                            <div class="progress-bar bg-success" style="width: {{ dues_summary.collection_rate }}%">
+                                {{ "%.1f"|format(dues_summary.collection_rate) }}% Collected
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-6 text-center">
+                                <span class="badge bg-success fs-6">{{ dues_summary.members_paid_up }} Paid Up</span>
+                            </div>
+                            <div class="col-6 text-center">
+                                <span class="badge bg-warning fs-6">{{ dues_summary.members_outstanding }} Outstanding</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Budget Management Form -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>💰 Set Budget Limits</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="row">
+                                {% for category in categories %}
+                                    {% set category_key = category.replace("(", "_").replace(")", "_").replace(" ", "_").replace(",", "") %}
+                                    {% set current_budget = budget_limits.get(category, 0) %}
+                                    {% set summary = budget_summary.get(category, {}) %}
+                                    
+                                    <div class="col-md-6 mb-3">
+                                        <div class="budget-category 
+                                            {% if summary.percent_used > 100 %}over-budget
+                                            {% elif summary.percent_used > 80 %}warning
+                                            {% else %}good{% endif %}">
+                                            
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <label for="budget_{{ category_key }}" class="form-label mb-0">
+                                                    <strong>{{ category }}</strong>
+                                                </label>
+                                                <div class="text-end">
+                                                    <a href="{{ url_for('edit_budget_category', category=category) }}" 
+                                                       class="btn btn-outline-primary btn-sm me-2" title="Edit Category">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </a>
+                                                    <small class="text-muted">
+                                                        ${{ "%.2f"|format(summary.spent) }} spent
+                                                    </small>
+                                                </div>
+                                            </div>
+                                            
+                                            <input type="number" 
+                                                   class="form-control mb-2" 
+                                                   id="budget_{{ category_key }}" 
+                                                   name="budget_{{ category_key }}" 
+                                                   value="{{ current_budget }}" 
+                                                   step="0.01" 
+                                                   placeholder="Budget limit">
+                                            
+                                            {% if current_budget > 0 %}
+                                                <div class="progress mb-2" style="height: 8px;">
+                                                    <div class="progress-bar 
+                                                        {% if summary.percent_used > 100 %}bg-danger
+                                                        {% elif summary.percent_used > 80 %}bg-warning
+                                                        {% else %}bg-success{% endif %}" 
+                                                        style="width: {{ [summary.percent_used, 100]|min }}%">
+                                                    </div>
+                                                </div>
+                                                <small class="text-muted">
+                                                    {{ "%.1f"|format(summary.percent_used) }}% used, 
+                                                    ${{ "%.2f"|format(summary.remaining) }} remaining
+                                                </small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="text-center mt-4">
+                                <button type="submit" class="btn btn-primary btn-lg">💾 Update Budget Limits</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Current Budget Summary -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5>📈 Budget Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Category</th>
+                                        <th>Budget Limit</th>
+                                        <th>Spent</th>
+                                        <th>Remaining</th>
+                                        <th>Usage</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for category, summary in budget_summary.items() %}
+                                        <tr>
+                                            <td><strong>{{ category }}</strong></td>
+                                            <td>${{ "%.2f"|format(summary.budget_limit) }}</td>
+                                            <td>${{ "%.2f"|format(summary.spent) }}</td>
+                                            <td>${{ "%.2f"|format(summary.remaining) }}</td>
+                                            <td>
+                                                <div class="progress" style="height: 20px;">
+                                                    <div class="progress-bar 
+                                                        {% if summary.percent_used > 100 %}bg-danger
+                                                        {% elif summary.percent_used > 80 %}bg-warning
+                                                        {% else %}bg-success{% endif %}" 
+                                                        style="width: {{ [summary.percent_used, 100]|min }}%">
+                                                        {{ "%.1f"|format(summary.percent_used) }}%
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                {% if summary.percent_used > 100 %}
+                                                    <span class="badge bg-danger">Over Budget</span>
+                                                {% elif summary.percent_used > 80 %}
+                                                    <span class="badge bg-warning">High Usage</span>
+                                                {% else %}
+                                                    <span class="badge bg-success">Good</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-secondary">
+                                        <th>TOTAL</th>
+                                        <th>${{ "%.2f"|format(budget_summary.values()|map(attribute='budget_limit')|sum) }}</th>
+                                        <th>${{ "%.2f"|format(budget_summary.values()|map(attribute='spent')|sum) }}</th>
+                                        <th>${{ "%.2f"|format(budget_summary.values()|map(attribute='remaining')|sum) }}</th>
+                                        <th colspan="2">
+                                            {% set total_budget = budget_summary.values()|map(attribute='budget_limit')|sum %}
+                                            {% set total_spent = budget_summary.values()|map(attribute='spent')|sum %}
+                                            {% set overall_usage = (total_spent / total_budget * 100) if total_budget > 0 else 0 %}
+                                            {{ "%.1f"|format(overall_usage) }}% overall usage
+                                        </th>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+
+{% block title %}{{ spending_plan.title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1>{{ spending_plan.title }}</h1>
+                    <p class="text-muted mb-0">
+                        {{ spending_plan.category }} • {{ spending_plan.semester.name }} • Version {{ spending_plan.version }}
+                    </p>
+                </div>
+                <div>
+                    <a href="{{ url_for('spending_plans.list_spending_plans') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Plans
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Plan Overview -->
+        <div class="col-md-8">
+            <!-- Status Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="bi bi-info-circle"></i> Plan Status</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>Status:</strong><br>
+                            {% if spending_plan.treasurer_approved %}
+                                <span class="badge bg-success fs-6">
+                                    <i class="bi bi-check-circle"></i> Approved
+                                </span>
+                                {% if plan_data.get('approval_date') %}
+                                <br><small class="text-muted">{{ plan_data.approval_date[:10] }}</small>
+                                {% endif %}
+                            {% elif plan_data.get('status') == 'rejected' %}
+                                <span class="badge bg-danger fs-6">
+                                    <i class="bi bi-x-circle"></i> Rejected
+                                </span>
+                                {% if plan_data.get('rejection_date') %}
+                                <br><small class="text-muted">{{ plan_data.rejection_date[:10] }}</small>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge bg-warning fs-6">
+                                    <i class="bi bi-clock"></i> Pending Review
+                                </span>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Total Budget:</strong><br>
+                            <span class="fs-5 text-success">${{ "{:,.2f}".format(plan_data.get('total_budget', 0)) }}</span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Events:</strong><br>
+                            <span class="fs-5 text-info">{{ plan_data.get('events', [])|length }}</span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Created:</strong><br>
+                            {{ spending_plan.created_at.strftime('%m/%d/%Y') }}<br>
+                            <small class="text-muted">{{ spending_plan.updated_at.strftime('%m/%d/%Y %I:%M %p') }} (updated)</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Description -->
+            {% if plan_data.get('description') %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="bi bi-text-paragraph"></i> Plan Description</h5>
+                </div>
+                <div class="card-body">
+                    <p>{{ plan_data.description }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Events List -->
+            {% if plan_data.get('events') %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="bi bi-calendar-event"></i> Planned Events & Activities</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Event Name</th>
+                                    <th>Date</th>
+                                    <th>Budget</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for event in plan_data.events %}
+                                <tr>
+                                    <td><strong>{{ event.name }}</strong></td>
+                                    <td>
+                                        {% if event.date %}
+                                            {{ event.date }}
+                                        {% else %}
+                                            <span class="text-muted">TBD</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-success">${{ "{:,.2f}".format(event.budget) }}</td>
+                                    <td>{{ event.description or '' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-light">
+                                    <th colspan="2">Total</th>
+                                    <th class="text-success">
+                                        ${{ "{:,.2f}".format(plan_data.events|sum(attribute='budget')) }}
+                                    </th>
+                                    <th></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Rejection Reason -->
+            {% if plan_data.get('status') == 'rejected' and plan_data.get('rejection_reason') %}
+            <div class="card border-danger mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5><i class="bi bi-exclamation-triangle"></i> Rejection Feedback</h5>
+                </div>
+                <div class="card-body">
+                    <p>{{ plan_data.rejection_reason }}</p>
+                    <small class="text-muted">
+                        You can revise your plan based on this feedback and resubmit for review.
+                    </small>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Approval Notes -->
+            {% if spending_plan.treasurer_approved and plan_data.get('approval_notes') %}
+            <div class="card border-success mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5><i class="bi bi-check-circle"></i> Approval Notes</h5>
+                </div>
+                <div class="card-body">
+                    <p>{{ plan_data.approval_notes }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-md-4">
+            <!-- Quick Actions -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6><i class="bi bi-lightning"></i> Quick Actions</h6>
+                </div>
+                <div class="card-body d-grid gap-2">
+                    {% if has_permission('manage_budgets') and not spending_plan.treasurer_approved %}
+                    <button class="btn btn-success approve-btn"
+                            data-bs-toggle="modal" data-bs-target="#approveModal"
+                            data-id="{{ spending_plan.id }}"
+                            data-title="{{ spending_plan.title }}"
+                            data-category="{{ spending_plan.category }}"
+                            data-budget="{{ plan_data.get('total_budget', 0) }}"
+                            data-events="{{ plan_data.get('events', [])|length }}"
+                            data-version="{{ spending_plan.version }}">
+                        <i class="bi bi-check-circle"></i> Approve Plan
+                    </button>
+                    <button class="btn btn-outline-danger reject-btn"
+                            data-bs-toggle="modal" data-bs-target="#rejectModal"
+                            data-id="{{ spending_plan.id }}"
+                            data-title="{{ spending_plan.title }}"
+                            data-category="{{ spending_plan.category }}"
+                            data-budget="{{ plan_data.get('total_budget', 0) }}">
+                        <i class="bi bi-x-circle"></i> Reject Plan
+                    </button>
+                    {% endif %}
+                    
+                    {% if has_permission('manage_own_budget') and spending_plan.created_by == current_user.id and not spending_plan.treasurer_approved %}
+                    <a href="{{ url_for('spending_plans.create_spending_plan') }}" class="btn btn-outline-warning">
+                        <i class="bi bi-pencil"></i> Revise Plan
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Budget Overview -->
+            {% if budget_limit %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6><i class="bi bi-piggy-bank"></i> Budget Overview</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Budget Limit:</span>
+                            <strong>${{ "{:,.2f}".format(budget_limit.amount) }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>This Plan:</span>
+                            <strong class="text-success">${{ "{:,.2f}".format(plan_data.get('total_budget', 0)) }}</strong>
+                        </div>
+                        {% set usage_pct = (plan_data.get('total_budget', 0) / budget_limit.amount * 100) if budget_limit.amount > 0 else 0 %}
+                        <div class="progress mt-2">
+                            <div class="progress-bar {% if usage_pct > 100 %}bg-danger{% elif usage_pct > 80 %}bg-warning{% else %}bg-success{% endif %}" 
+                                 style="width: {{ usage_pct|min(100) }}%"></div>
+                        </div>
+                        <small class="text-muted">{{ "%.1f"|format(usage_pct) }}% of budget limit</small>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Plan Info -->
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="bi bi-info-circle"></i> Plan Information</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <strong>Category:</strong><br>
+                        <span class="badge bg-primary">{{ spending_plan.category }}</span>
+                    </div>
+                    <div class="mb-2">
+                        <strong>Semester:</strong><br>
+                        {{ spending_plan.semester.name }}
+                    </div>
+                    <div class="mb-2">
+                        <strong>Version:</strong><br>
+                        v{{ spending_plan.version }}
+                    </div>
+                    <div class="mb-2">
+                        <strong>Created:</strong><br>
+                        {{ spending_plan.created_at.strftime('%m/%d/%Y %I:%M %p') }}
+                    </div>
+                    <div>
+                        <strong>Last Updated:</strong><br>
+                        {{ spending_plan.updated_at.strftime('%m/%d/%Y %I:%M %p') }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include approval/rejection modals if user has permissions -->
+{% if has_permission('manage_budgets') %}
+{% include 'spending_plans/partials/action_modals.html' %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Include the same approval/rejection JavaScript from admin_list.html
+// This could be extracted to a separate JS file for reuse
+document.addEventListener('DOMContentLoaded', function() {
+    let currentPlanId = null;
+    
+    // Handle approve button clicks
+    document.querySelectorAll('.approve-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            currentPlanId = this.dataset.id;
+            const title = this.dataset.title;
+            const category = this.dataset.category;
+            const budget = parseFloat(this.dataset.budget);
+            const events = parseInt(this.dataset.events);
+            
+            document.getElementById('approveDetails').innerHTML = `
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h6>${title}</h6>
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <strong>Category:</strong> ${category}<br>
+                                <strong>Total Budget:</strong> $${budget.toFixed(2)}
+                            </div>
+                            <div class="col-sm-6">
+                                <strong>Events:</strong> ${events}<br>
+                                <strong>Version:</strong> ${this.dataset.version}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('approvalNotes').value = '';
+        });
+    });
+
+    // Handle reject button clicks
+    document.querySelectorAll('.reject-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            currentPlanId = this.dataset.id;
+            const title = this.dataset.title;
+            const category = this.dataset.category;
+            const budget = parseFloat(this.dataset.budget);
+            
+            document.getElementById('rejectDetails').innerHTML = `
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h6>${title}</h6>
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <strong>Category:</strong> ${category}
+                            </div>
+                            <div class="col-sm-6">
+                                <strong>Total Budget:</strong> $${budget.toFixed(2)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('rejectionReason').value = '';
+        });
+    });
+
+    // Approve and reject handlers (same as admin_list.html)
+    document.getElementById('confirmApprove')?.addEventListener('click', function() {
+        if (!currentPlanId) return;
+        
+        const notes = document.getElementById('approvalNotes').value.trim();
+        
+        this.disabled = true;
+        this.innerHTML = '<i class="spinner-border spinner-border-sm me-2"></i>Approving...';
+        
+        fetch(`/spending-plans/${currentPlanId}/approve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes: notes })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+                this.disabled = false;
+                this.innerHTML = '<i class="bi bi-check-circle"></i> Approve Plan';
+            }
+        })
+        .catch(error => {
+            alert('Error approving plan');
+            this.disabled = false;
+            this.innerHTML = '<i class="bi bi-check-circle"></i> Approve Plan';
+        });
+    });
+
+    document.getElementById('confirmReject')?.addEventListener('click', function() {
+        if (!currentPlanId) return;
+        
+        const reason = document.getElementById('rejectionReason').value.trim();
+        if (!reason) {
+            alert('Please provide a rejection reason');
+            return;
+        }
+        
+        this.disabled = true;
+        this.innerHTML = '<i class="spinner-border spinner-border-sm me-2"></i>Rejecting...';
+        
+        fetch(`/spending-plans/${currentPlanId}/reject`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: reason })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+                this.disabled = false;
+                this.innerHTML = '<i class="bi bi-x-circle"></i> Reject Plan';
+            }
+        })
+        .catch(error => {
+            alert('Error rejecting plan');
+            this.disabled = false;
+            this.innerHTML = '<i class="bi bi-x-circle"></i> Reject Plan';
+        });
+    });
+});
+</script>
+{% endblock %}

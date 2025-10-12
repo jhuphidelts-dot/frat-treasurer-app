@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ managed_category }} Chair Dashboard - Fraternity Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-purple" style="background: linear-gradient(45deg, #667eea, #764ba2) !important;">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('main.dashboard') }}">
+                <i class="bi bi-star-fill"></i> {{ managed_category }} Chair
+            </a>
+            <div class="navbar-nav ms-auto">
+                {% for item in get_accessible_menu_items() %}
+                <a class="nav-link" href="{{ url_for(item.url) }}">
+                    <i class="bi bi-{{ item.icon }}"></i> {{ item.name }}
+                </a>
+                {% endfor %}
+                <a class="nav-link" href="{{ url_for('auth.profile') }}">
+                    <i class="bi bi-person-circle"></i> {{ current_user.first_name }}
+                </a>
+                <a class="nav-link" href="{{ url_for('auth.logout') }}">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="mb-4">
+                    <i class="bi bi-star"></i> {{ managed_category }} Budget Management
+                    <small class="text-muted">Manage your department's finances</small>
+                </h1>
+                
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+
+        <!-- Budget Overview Cards -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title">Total Spent</h5>
+                                <h2 class="mb-0">${{ "%.2f"|format(total_spent) }}</h2>
+                            </div>
+                            <i class="bi bi-cash-stack fs-1"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title">Pending Requests</h5>
+                                <h2 class="mb-0">{{ pending_requests|length }}</h2>
+                            </div>
+                            <i class="bi bi-clock-history fs-1"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title">Transactions</h5>
+                                <h2 class="mb-0">{{ transactions|length }}</h2>
+                            </div>
+                            <i class="bi bi-receipt fs-1"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Recent Transactions -->
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-list-ul"></i> {{ managed_category }} Transactions
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if transactions %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Description</th>
+                                            <th>Amount</th>
+                                            <th>Type</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for transaction in transactions[:10] %}
+                                        <tr>
+                                            <td>{{ transaction.date.strftime('%m/%d/%Y') }}</td>
+                                            <td>{{ transaction.description }}</td>
+                                            <td>
+                                                <strong class="{{ 'text-success' if transaction.type == 'income' else 'text-danger' }}">
+                                                    ${{ "%.2f"|format(transaction.amount) }}
+                                                </strong>
+                                            </td>
+                                            <td>
+                                                <span class="badge {{ 'bg-success' if transaction.type == 'income' else 'bg-danger' }}">
+                                                    <i class="bi bi-{{ 'arrow-down' if transaction.type == 'income' else 'arrow-up' }}"></i>
+                                                    {{ transaction.type.title() }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {% if has_permission('edit_transactions') %}
+                                                <button class="btn btn-sm btn-outline-primary" disabled>
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                {% endif %}
+                                                <button class="btn btn-sm btn-outline-info" onclick="viewTransaction('{{ transaction.id }}')">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            {% if transactions|length > 10 %}
+                            <div class="text-center mt-3">
+                                <button class="btn btn-outline-primary" disabled>
+                                    View All {{ transactions|length }} Transactions
+                                </button>
+                            </div>
+                            {% endif %}
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="bi bi-receipt text-muted" style="font-size: 3rem;"></i>
+                                <h5 class="text-muted mt-3">No transactions yet</h5>
+                                <p class="text-muted">{{ managed_category }} spending will appear here.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions & Management -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-lightning-charge"></i> Quick Actions
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary" disabled>
+                                <i class="bi bi-plus-circle"></i> Add Expense
+                                <small class="d-block">Coming Soon</small>
+                            </button>
+                            
+                            <button class="btn btn-success" disabled>
+                                <i class="bi bi-receipt"></i> Request Reimbursement
+                                <small class="d-block">Coming Soon</small>
+                            </button>
+                            
+                            <button class="btn btn-info" disabled>
+                                <i class="bi bi-calendar-plus"></i> Create Spending Plan
+                                <small class="d-block">Coming Soon</small>
+                            </button>
+                            
+                            <button class="btn btn-warning" disabled>
+                                <i class="bi bi-bell"></i> Send Reminders
+                                <small class="d-block">Coming Soon</small>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Budget Status -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-pie-chart"></i> Budget Status
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <canvas id="budgetChart" width="200" height="200"></canvas>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Your {{ managed_category }} Budget</strong><br>
+                            Track your spending and submit reimbursement requests for approved expenses.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pending Requests -->
+                {% if pending_requests %}
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-clock-history"></i> Pending Requests
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% for request in pending_requests %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <strong>${{ "%.2f"|format(request.amount) }}</strong><br>
+                                <small class="text-muted">{{ request.purpose[:30] }}...</small>
+                            </div>
+                            <span class="badge bg-warning text-dark">Pending</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Role Information -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-person-badge"></i> Your Role
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Position:</strong> {{ managed_category }} Chair</p>
+                        <p><strong>Permissions:</strong></p>
+                        <ul class="list-unstyled">
+                            <li><i class="bi bi-check text-success"></i> Manage {{ managed_category }} budget</li>
+                            <li><i class="bi bi-check text-success"></i> Add expenses</li>
+                            <li><i class="bi bi-check text-success"></i> Request reimbursements</li>
+                            <li><i class="bi bi-check text-success"></i> Create spending plans</li>
+                        </ul>
+                        
+                        <small class="text-muted">
+                            Contact the treasurer for questions about your budget allocation.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Create budget status chart
+        const ctx = document.getElementById('budgetChart').getContext('2d');
+        
+        // Sample data - will be replaced with real budget data
+        const spent = {{ total_spent }};
+        const budgetLimit = {{ total_spent + 1000 }}; // Placeholder
+        const remaining = budgetLimit - spent;
+        
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Spent', 'Remaining'],
+                datasets: [{
+                    data: [spent, remaining > 0 ? remaining : 0],
+                    backgroundColor: [
+                        '#dc3545',  // Red for spent
+                        '#28a745'   // Green for remaining
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 10,
+                            usePointStyle: true
+                        }
+                    }
+                }
+            }
+        });
+
+        // Transaction detail viewer
+        function viewTransaction(transactionId) {
+            // Placeholder for transaction detail modal
+            alert('Transaction details coming soon! ID: ' + transactionId);
+        }
+
+        // Auto-refresh data every 5 minutes
+        setInterval(function() {
+            if (!document.hidden) {
+                // Refresh transaction data
+                location.reload();
+            }
+        }, 300000);
+
+        // Show tips based on spending
+        {% if total_spent > 0 %}
+        console.log('{{ managed_category }} spending is being tracked. Total: ${{ "%.2f"|format(total_spent) }}');
+        {% endif %}
+    </script>
+</body>
+</html>

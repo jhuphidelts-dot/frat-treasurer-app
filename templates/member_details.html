@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ member.name }} - Member Details</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .payment-schedule-item {
+            border-left: 4px solid #007bff;
+            padding-left: 15px;
+            margin-bottom: 15px;
+        }
+        .payment-schedule-item.paid {
+            border-left-color: #28a745;
+            background-color: #f8fff9;
+        }
+        .payment-schedule-item.pending {
+            border-left-color: #ffc107;
+            background-color: #fffdf5;
+        }
+        .payment-history-item {
+            border-bottom: 1px solid #dee2e6;
+            padding: 10px 0;
+        }
+        .payment-history-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-10 mx-auto">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1>{{ member.name }}</h1>
+                    <div>
+                        <a href="/edit_member/{{ member.id }}" class="btn btn-primary me-2">✏️ Edit</a>
+                        <a href="/custom_payment_schedule/{{ member.id }}" class="btn btn-outline-info me-2">📅 Custom Schedule</a>
+                        <a href="/" class="btn btn-secondary">← Back to Dashboard</a>
+                    </div>
+                </div>
+
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages() %}
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="row">
+                    <!-- Member Info & Quick Stats -->
+                    <div class="col-lg-4">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5>Member Information</h5>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>Name:</strong> {{ member.name }}</p>
+                                <p><strong>Phone:</strong> {{ member.phone }}</p>
+                                <p><strong>Total Dues:</strong> ${{ "%.2f"|format(member.dues_amount) }}</p>
+                                <p><strong>Payment Plan:</strong> {{ member.payment_plan|title }}</p>
+                                <hr>
+                                <p><strong>Total Paid:</strong> 
+                                    <span class="text-success">${{ "%.2f"|format(member.payments_made|map(attribute='amount')|sum) }}</span>
+                                </p>
+                                <p><strong>Balance Due:</strong> 
+                                    {% if balance <= 0 %}
+                                        <span class="text-success">${{ "%.2f"|format(balance) }}</span>
+                                    {% else %}
+                                        <span class="text-danger">${{ "%.2f"|format(balance) }}</span>
+                                    {% endif %}
+                                </p>
+                                <p><strong>Status:</strong> 
+                                    {% if balance <= 0 %}
+                                        <span class="badge bg-success">Paid Up</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Outstanding</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Quick Payment Form -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5>Record Payment</h5>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST" action="/record_payment">
+                                    <input type="hidden" name="member_id" value="{{ member.id }}">
+                                    <div class="mb-3">
+                                        <label for="amount" class="form-label">Payment Amount</label>
+                                        <input type="number" class="form-control" id="amount" name="amount" 
+                                               step="0.01" placeholder="0.00" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="payment_method" class="form-label">Payment Method</label>
+                                        <select class="form-control" id="payment_method" name="payment_method" required>
+                                            <option value="">Select Method</option>
+                                            <option value="Zelle">Zelle</option>
+                                            <option value="Venmo">Venmo</option>
+                                            <option value="Cash">Cash</option>
+                                            <option value="Check">Check</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="btn btn-success w-100">Record Payment</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payment Schedule & History -->
+                    <div class="col-lg-8">
+                        <!-- Payment Schedule -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5>Payment Schedule</h5>
+                            </div>
+                            <div class="card-body">
+                                {% if payment_schedule %}
+                                    {% for payment in payment_schedule %}
+                                        <div class="payment-schedule-item {{ payment.status }} p-3 rounded">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <h6 class="mb-1">{{ payment.description }}</h6>
+                                                    <small class="text-muted">Due: {{ payment.due_date[:10] }}</small>
+                                                </div>
+                                                <div class="text-end">
+                                                    <strong class="fs-5">${{ "%.2f"|format(payment.amount) }}</strong>
+                                                    {% if payment.status == 'paid' %}
+                                                        <br><span class="badge bg-success">✓ Paid</span>
+                                                    {% else %}
+                                                        <br><span class="badge bg-warning">⏱ Pending</span>
+                                                        {% if payment.amount_due > 0 %}
+                                                            <br><small class="text-muted">Due: ${{ "%.2f"|format(payment.amount_due) }}</small>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="alert alert-info">
+                                        <p class="mb-0">No payment schedule available. This may happen if:</p>
+                                        <ul class="mb-0 mt-2">
+                                            <li>The member was created before the payment schedule feature</li>
+                                            <li>The payment plan is set to 'custom' without a defined schedule</li>
+                                        </ul>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Payment History -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>Payment History</h5>
+                            </div>
+                            <div class="card-body">
+                                {% if member.payments_made %}
+                                    {% for payment in member.payments_made|reverse %}
+                                        <div class="payment-history-item">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <h6 class="mb-1">${{ "%.2f"|format(payment.amount) }}</h6>
+                                                    <small class="text-muted">
+                                                        {{ payment.date[:10] }} via {{ payment.method }}
+                                                    </small>
+                                                </div>
+                                                <div class="text-end">
+                                                    <span class="badge bg-success">Received</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                    
+                                    <div class="mt-3 p-3 bg-light rounded">
+                                        <div class="row text-center">
+                                            <div class="col-4">
+                                                <strong>Total Payments</strong><br>
+                                                <span class="text-primary">{{ member.payments_made|length }}</span>
+                                            </div>
+                                            <div class="col-4">
+                                                <strong>Total Amount</strong><br>
+                                                <span class="text-success">${{ "%.2f"|format(member.payments_made|map(attribute='amount')|sum) }}</span>
+                                            </div>
+                                            <div class="col-4">
+                                                <strong>Avg Payment</strong><br>
+                                                <span class="text-info">${{ "%.2f"|format((member.payments_made|map(attribute='amount')|sum) / (member.payments_made|length)) }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-warning">
+                                        <p class="mb-0">No payments recorded yet.</p>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

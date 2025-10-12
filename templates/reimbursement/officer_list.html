@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}My Reimbursement Requests{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="bi bi-receipt"></i> My Reimbursement Requests</h1>
+                <a href="{{ url_for('reimbursement.create_reimbursement') }}" 
+                   class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Submit New Request
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <i class="bi bi-clock text-warning fs-1"></i>
+                    <h5 class="card-title mt-2">Pending</h5>
+                    <h3 class="text-warning">{{ requests|selectattr('status', 'equalto', 'pending')|list|length }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <i class="bi bi-check-circle text-success fs-1"></i>
+                    <h5 class="card-title mt-2">Approved</h5>
+                    <h3 class="text-success">{{ requests|selectattr('status', 'equalto', 'approved')|list|length }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-danger">
+                <div class="card-body text-center">
+                    <i class="bi bi-x-circle text-danger fs-1"></i>
+                    <h5 class="card-title mt-2">Rejected</h5>
+                    <h3 class="text-danger">{{ requests|selectattr('status', 'equalto', 'rejected')|list|length }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Requests Table -->
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date Submitted</th>
+                            <th>Category</th>
+                            <th>Amount</th>
+                            <th>Description</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for request in requests %}
+                        <tr>
+                            <td>
+                                <div class="d-flex flex-column">
+                                    <span class="fw-bold">{{ request.created_at.strftime('%m/%d/%Y') }}</span>
+                                    <small class="text-muted">{{ request.created_at.strftime('%I:%M %p') }}</small>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark">{{ request.category }}</span>
+                            </td>
+                            <td>
+                                <span class="fw-bold text-success">${{ "{:,.2f}".format(request.amount) }}</span>
+                            </td>
+                            <td>
+                                <div style="max-width: 300px;">
+                                    <span class="text-truncate d-block" title="{{ request.purpose }}">
+                                        {{ request.purpose }}
+                                    </span>
+                                    {% if request.receipt_filename %}
+                                    <small class="text-info">
+                                        <i class="bi bi-paperclip"></i> Receipt attached
+                                    </small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                {% if request.status == 'pending' %}
+                                    <span class="badge bg-warning">
+                                        <i class="bi bi-clock"></i> Pending Review
+                                    </span>
+                                {% elif request.status == 'approved' %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle"></i> Approved
+                                    </span>
+                                    {% if request.reviewed_by %}
+                                    <br><small class="text-muted">by User {{ request.reviewed_by }}</small>
+                                    <br><small class="text-muted">{{ request.reviewed_at.strftime('%m/%d/%Y') }}</small>
+                                    {% endif %}
+                                {% elif request.status == 'rejected' %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-x-circle"></i> Rejected
+                                    </span>
+                                    {% if request.reviewed_by %}
+                                    <br><small class="text-muted">by User {{ request.reviewed_by }}</small>
+                                    <br><small class="text-muted">{{ request.reviewed_at.strftime('%m/%d/%Y') }}</small>
+                                    {% endif %}
+                                    {% if request.reviewer_notes %}
+                                    <br><small class="text-danger">{{ request.reviewer_notes }}</small>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{{ url_for('reimbursement.view_reimbursement', id=request.id) }}" 
+                                       class="btn btn-sm btn-outline-primary" title="View Details">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    {% if request.receipt_filename %}
+                                    <a href="{{ url_for('reimbursement.view_receipt', id=request.id) }}" 
+                                       class="btn btn-sm btn-outline-info" title="View Receipt" target="_blank">
+                                        <i class="bi bi-paperclip"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                <i class="bi bi-inbox fs-1"></i>
+                                <div class="mt-2">No reimbursement requests found</div>
+                                <div class="mt-2">
+                                    <a href="{{ url_for('reimbursement.create_reimbursement') }}" 
+                                       class="btn btn-primary">
+                                        <i class="bi bi-plus-circle"></i> Submit Your First Request
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if requests %}
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        <div class="text-muted">
+            Showing {{ requests|length }} request{{ 's' if requests|length != 1 else '' }}
+        </div>
+        <div>
+            Total Amount: ${{ "{:,.2f}".format(requests|sum(attribute='amount')) }}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Auto-refresh every 60 seconds
+    setTimeout(function() {
+        location.reload();
+    }, 60000);
+</script>
+{% endblock %}

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Import Members - Fraternity Treasurer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .member-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .member-card.selected {
+            border-color: #28a745;
+            background: #f0fff0;
+        }
+        .error-alert {
+            background: #ffe6e6;
+            border: 1px solid #ff9999;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 5px 0;
+        }
+        .preview-area {
+            max-height: 600px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .format-examples {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h1>📊 Bulk Import Members</h1>
+                <p class="lead">Copy and paste your member list from Google Sheets, then review and confirm.</p>
+                
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+                        <li class="breadcrumb-item active">Bulk Import</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+
+        {% if not show_review %}
+        <!-- Step 1: Paste Data -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>📋 Step 1: Paste Your Member Data</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="format-examples">
+                            <h6>📝 Supported Formats:</h6>
+                            <ul>
+                                <li><strong>Tab-separated:</strong> John Doe&nbsp;&nbsp;&nbsp;&nbsp;5551234567</li>
+                                <li><strong>Comma-separated:</strong> John Doe, 5551234567</li>
+                                <li><strong>Space-separated:</strong> John Doe 5551234567</li>
+                                <li><strong>Three columns:</strong> John&nbsp;&nbsp;&nbsp;&nbsp;Doe&nbsp;&nbsp;&nbsp;&nbsp;5551234567</li>
+                            </ul>
+                            <small class="text-muted">💡 Just copy directly from Google Sheets and paste below!</small>
+                        </div>
+
+                        <form method="POST">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <label for="member_data" class="form-label">Member Data (Name and Phone):</label>
+                                    <textarea class="form-control" id="member_data" name="member_data" rows="15" 
+                                              placeholder="Paste your member list here...&#10;Example:&#10;John Doe	5551234567&#10;Jane Smith	5559876543&#10;Bob Johnson	5551112222" 
+                                              required></textarea>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="default_dues" class="form-label">Default Dues Amount:</label>
+                                    <input type="number" class="form-control" id="default_dues" name="default_dues" 
+                                           step="0.01" value="150.00" required>
+                                    
+                                    <label for="default_payment_plan" class="form-label mt-3">Default Payment Plan:</label>
+                                    <select class="form-control" id="default_payment_plan" name="default_payment_plan" required>
+                                        <option value="semester">Full Semester</option>
+                                        <option value="monthly">Monthly</option>
+                                        <option value="custom">Custom Plan</option>
+                                    </select>
+
+                                    <div class="mt-4">
+                                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                                            🔍 Parse & Review Data
+                                        </button>
+                                    </div>
+
+                                    <div class="mt-3 text-muted">
+                                        <small>
+                                            <strong>Note:</strong> Just names and phone numbers needed. 
+                                            Copy directly from your Google Sheets roster!
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% else %}
+        <!-- Step 2: Review & Confirm -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5>✅ Step 2: Review Parsed Members</h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-success" onclick="selectAll()">Select All</button>
+                            <button class="btn btn-sm btn-outline-warning" onclick="selectNone()">Select None</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        
+                        <!-- Show Errors First -->
+                        {% if errors %}
+                        <div class="alert alert-warning">
+                            <h6>⚠️ Parsing Issues:</h6>
+                            {% for error in errors %}
+                                <div class="error-alert">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <!-- Show Successfully Parsed Members -->
+                        {% if parsed_members %}
+                        <form method="POST" action="/confirm_bulk_import">
+                            <input type="hidden" name="member_count" value="{{ parsed_members|length }}">
+                            
+                            <div class="alert alert-success">
+                                <strong>🎉 Successfully parsed {{ parsed_members|length }} members!</strong>
+                                Review the details below, make any necessary edits, and select which members to add.
+                            </div>
+
+                            <div class="preview-area">
+                                {% for member in parsed_members %}
+                                {% set i = loop.index0 %}
+                                <div class="member-card" id="member_{{ i }}">
+                                    <div class="row">
+                                        <div class="col-1">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" 
+                                                       id="include_{{ i }}" name="include_{{ i }}" 
+                                                       checked onclick="toggleMemberCard({{ i }})">
+                                                <label class="form-check-label" for="include_{{ i }}">
+                                                    #{{ i + 1 }}
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-11">
+                                            <div class="row">
+                                                <div class="col-md-3">
+                                                    <label class="form-label fw-bold">Name:</label>
+                                                    <input type="text" class="form-control" 
+                                                           name="name_{{ i }}" value="{{ member.name }}">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label fw-bold">Phone:</label>
+                                                    <input type="tel" class="form-control" 
+                                                           name="phone_{{ i }}" value="{{ member.phone }}">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label fw-bold">Dues:</label>
+                                                    <input type="number" class="form-control" 
+                                                           name="dues_{{ i }}" value="{{ member.dues_amount }}" step="0.01">
+                                                </div>
+                                                <div class="col-md-1.5">
+                                                    <label class="form-label fw-bold">Plan:</label>
+                                                    <select class="form-control" name="plan_{{ i }}">
+                                                        <option value="semester" {% if member.payment_plan == 'semester' %}selected{% endif %}>Semester</option>
+                                                        <option value="monthly" {% if member.payment_plan == 'monthly' %}selected{% endif %}>Monthly</option>
+                                                        <option value="custom" {% if member.payment_plan == 'custom' %}selected{% endif %}>Custom</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="d-flex justify-content-between mt-4">
+                                <a href="/bulk_import" class="btn btn-secondary">
+                                    ⬅️ Back to Edit Data
+                                </a>
+                                <button type="submit" class="btn btn-success btn-lg">
+                                    ✅ Add Selected Members
+                                </button>
+                            </div>
+                        </form>
+
+                        {% else %}
+                        <div class="alert alert-danger">
+                            <h6>❌ No valid members found</h6>
+                            <p>Please check your data format and try again.</p>
+                            <a href="/bulk_import" class="btn btn-primary">Try Again</a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Quick Help -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <h6>💡 Quick Tips:</h6>
+                    <ul>
+                        <li><strong>From Google Sheets:</strong> Select your Name and Phone columns, copy (Ctrl+C), and paste here</li>
+                        <li><strong>Phone Format:</strong> Any format works - (555) 123-4567, 555-123-4567, 5551234567</li>
+                        <li><strong>Names:</strong> Full names work best - "John Doe" is better than just "John"</li>
+                        <li><strong>Simple Process:</strong> Just name and phone - the system handles the rest!</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function toggleMemberCard(index) {
+            const checkbox = document.getElementById(`include_${index}`);
+            const card = document.getElementById(`member_${index}`);
+            
+            if (checkbox.checked) {
+                card.classList.add('selected');
+            } else {
+                card.classList.remove('selected');
+            }
+        }
+
+        function selectAll() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"][id^="include_"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = true;
+                const index = checkbox.id.split('_')[1];
+                document.getElementById(`member_${index}`).classList.add('selected');
+            });
+        }
+
+        function selectNone() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"][id^="include_"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+                const index = checkbox.id.split('_')[1];
+                document.getElementById(`member_${index}`).classList.remove('selected');
+            });
+        }
+
+        // Initialize selected state for all checked items
+        document.addEventListener('DOMContentLoaded', function() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"][id^="include_"]');
+            checkboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    const index = checkbox.id.split('_')[1];
+                    document.getElementById(`member_${index}`).classList.add('selected');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

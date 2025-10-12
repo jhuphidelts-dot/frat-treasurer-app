@@ -1,0 +1,556 @@
+/* Enhanced UI Components for Fraternity Treasurer App */
+
+/* ================================
+   ENHANCED FORM COMPONENTS
+================================ */
+
+/* Floating Label Forms */
+.form-floating {
+    position: relative;
+}
+
+.form-floating > .form-control:focus ~ label,
+.form-floating > .form-control:not(:placeholder-shown) ~ label {
+    opacity: 0.65;
+    transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
+}
+
+/* Custom Date Picker Styling */
+.date-picker-wrapper {
+    position: relative;
+}
+
+.date-picker-wrapper .form-control {
+    padding-right: 2.5rem;
+}
+
+.date-picker-wrapper .calendar-icon {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6c757d;
+    pointer-events: none;
+}
+
+/* Enhanced Multi-Select */
+.multi-select-container {
+    position: relative;
+}
+
+.multi-select-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ced4da;
+    border-top: none;
+    border-radius: 0 0 0.375rem 0.375rem;
+    z-index: 1050;
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.multi-select-option {
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.multi-select-option:hover {
+    background-color: #f8f9fa;
+}
+
+.multi-select-option.selected {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.multi-select-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+}
+
+.multi-select-tag {
+    background-color: #0d6efd;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.multi-select-tag .remove {
+    cursor: pointer;
+    font-weight: bold;
+}
+
+/* ================================
+   PROGRESS INDICATORS
+================================ */
+
+/* Enhanced Progress Bars */
+.progress-enhanced {
+    height: 1.5rem;
+    border-radius: 0.5rem;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.progress-enhanced .progress-bar {
+    border-radius: 0.5rem;
+    background: linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent);
+    background-size: 1rem 1rem;
+    animation: progress-bar-stripes 1s linear infinite;
+}
+
+@keyframes progress-bar-stripes {
+    0% {
+        background-position-x: 1rem;
+    }
+}
+
+.progress-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-weight: bold;
+    font-size: 0.875rem;
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.5);
+}
+
+/* Step Progress Indicator */
+.step-progress {
+    display: flex;
+    justify-content: space-between;
+    margin: 2rem 0;
+    position: relative;
+}
+
+.step-progress::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: #dee2e6;
+    z-index: 1;
+}
+
+.step-progress-item {
+    position: relative;
+    z-index: 2;
+    background: white;
+    padding: 0 0.5rem;
+    text-align: center;
+}
+
+.step-progress-circle {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background-color: #dee2e6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.5rem;
+    font-weight: bold;
+    color: #6c757d;
+    transition: all 0.3s;
+}
+
+.step-progress-item.active .step-progress-circle {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.step-progress-item.completed .step-progress-circle {
+    background-color: #198754;
+    color: white;
+}
+
+/* ================================
+   ENHANCED CARDS & LAYOUTS
+================================ */
+
+/* Glassmorphism Cards */
+.card-glass {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+}
+
+/* Hover Effects for Cards */
+.card-hover {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card-hover:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Status Cards */
+.status-card {
+    border-left: 4px solid;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+}
+
+.status-card.status-success {
+    border-left-color: #198754;
+}
+
+.status-card.status-warning {
+    border-left-color: #ffc107;
+}
+
+.status-card.status-danger {
+    border-left-color: #dc3545;
+}
+
+.status-card.status-info {
+    border-left-color: #0dcaf0;
+}
+
+/* ================================
+   INTERACTIVE ELEMENTS
+================================ */
+
+/* Enhanced Tooltips */
+.tooltip-enhanced {
+    position: relative;
+    cursor: help;
+}
+
+.tooltip-enhanced .tooltip-content {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #333;
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+    z-index: 1000;
+}
+
+.tooltip-enhanced:hover .tooltip-content {
+    opacity: 1;
+    visibility: visible;
+}
+
+.tooltip-enhanced .tooltip-content::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #333;
+}
+
+/* Collapsible Sections */
+.collapsible-section {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+}
+
+.collapsible-header {
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.3s;
+}
+
+.collapsible-header:hover {
+    background-color: #e9ecef;
+}
+
+.collapsible-content {
+    padding: 1rem;
+    display: none;
+}
+
+.collapsible-content.show {
+    display: block;
+    animation: slideDown 0.3s ease-in-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.collapsible-icon {
+    transition: transform 0.3s;
+}
+
+.collapsible-section.expanded .collapsible-icon {
+    transform: rotate(180deg);
+}
+
+/* ================================
+   ENHANCED BUTTONS
+================================ */
+
+/* Loading Button States */
+.btn-loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.btn-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: button-loading-spinner 1s ease infinite;
+}
+
+@keyframes button-loading-spinner {
+    from {
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+
+.btn-loading .btn-text {
+    opacity: 0;
+}
+
+/* Gradient Buttons */
+.btn-gradient-primary {
+    background: linear-gradient(45deg, #0d6efd, #6610f2);
+    border: none;
+    color: white;
+}
+
+.btn-gradient-success {
+    background: linear-gradient(45deg, #198754, #20c997);
+    border: none;
+    color: white;
+}
+
+.btn-gradient-danger {
+    background: linear-gradient(45deg, #dc3545, #e91e63);
+    border: none;
+    color: white;
+}
+
+/* Icon Buttons */
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-icon-only {
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+/* ================================
+   RESPONSIVE ENHANCEMENTS
+================================ */
+
+/* Mobile-First Design */
+@media (max-width: 768px) {
+    .card-deck {
+        flex-direction: column;
+    }
+    
+    .btn-group {
+        flex-direction: column;
+    }
+    
+    .btn-group .btn {
+        border-radius: 0.375rem !important;
+        margin-bottom: 0.5rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+}
+
+/* Touch-Friendly Elements */
+@media (hover: none) and (pointer: coarse) {
+    .btn {
+        min-height: 2.75rem;
+    }
+    
+    .form-control {
+        min-height: 2.75rem;
+    }
+    
+    .card-hover:hover {
+        transform: none;
+        box-shadow: none;
+    }
+}
+
+/* ================================
+   ACCESSIBILITY ENHANCEMENTS
+================================ */
+
+/* Focus Indicators */
+.form-control:focus,
+.btn:focus {
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    outline: none;
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+    .card {
+        border-width: 2px;
+    }
+    
+    .btn {
+        border-width: 2px;
+    }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ================================
+   UTILITY CLASSES
+================================ */
+
+/* Spacing Utilities */
+.spacer-1 { height: 1rem; }
+.spacer-2 { height: 2rem; }
+.spacer-3 { height: 3rem; }
+
+/* Shadow Utilities */
+.shadow-soft {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.shadow-medium {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.shadow-strong {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Border Radius Utilities */
+.rounded-xl { border-radius: 1rem; }
+.rounded-xxl { border-radius: 2rem; }
+
+/* Text Utilities */
+.text-gradient-primary {
+    background: linear-gradient(45deg, #0d6efd, #6610f2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Animation Utilities */
+.fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.slide-in-up {
+    animation: slideInUp 0.5s ease-out;
+}
+
+@keyframes slideInUp {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Loading Animations */
+.skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+}
+
+@keyframes skeleton-loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
+}

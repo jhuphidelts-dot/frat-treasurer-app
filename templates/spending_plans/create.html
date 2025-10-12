@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+
+{% block title %}Create Spending Plan{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="bi bi-calendar-event"></i> Create Spending Plan - {{ managed_category }}</h4>
+                    <p class="mb-0 text-muted">Plan your semester budget for {{ current_semester.name }}</p>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="spendingPlanForm">
+                        <!-- Hidden fields -->
+                        <input type="hidden" name="category" value="{{ managed_category }}">
+                        <input type="hidden" name="event_count" id="eventCount" value="0">
+                        
+                        <!-- Plan Details -->
+                        <div class="row mb-4">
+                            <div class="col-md-8">
+                                <label for="title" class="form-label">Plan Title *</label>
+                                <input type="text" class="form-control" id="title" name="title" 
+                                       placeholder="e.g., {{ managed_category }} Fall 2024 Plan" required>
+                                <div class="form-text">Give your spending plan a descriptive name</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="total_budget" class="form-label">Total Budget *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="total_budget" name="total_budget" 
+                                           step="0.01" min="0" max="{{ budget_limit.amount }}" 
+                                           placeholder="{{ budget_limit.amount }}" required>
+                                </div>
+                                <div class="form-text">Limit: ${{ "{:,.2f}".format(budget_limit.amount) }}</div>
+                            </div>
+                        </div>
+
+                        <!-- Description -->
+                        <div class="mb-4">
+                            <label for="description" class="form-label">Plan Description *</label>
+                            <textarea class="form-control" id="description" name="description" rows="3" required
+                                      placeholder="Describe the overall goals and approach for your {{ managed_category }} budget this semester..."></textarea>
+                            <div class="form-text">
+                                Explain your vision and priorities for the semester
+                                <span id="descCharCount" class="float-end">0/1000</span>
+                            </div>
+                        </div>
+
+                        <!-- Budget Events Section -->
+                        <div class="card mb-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="bi bi-calendar-check"></i> Planned Events & Activities</h5>
+                                <div>
+                                    <button type="button" class="btn btn-outline-info btn-sm me-2" id="loadTemplateBtn">
+                                        <i class="bi bi-template"></i> Load Template
+                                    </button>
+                                    <button type="button" class="btn btn-primary btn-sm" id="addEventBtn">
+                                        <i class="bi bi-plus"></i> Add Event
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div id="eventsContainer">
+                                    <div class="text-center text-muted py-4" id="emptyEventsMessage">
+                                        <i class="bi bi-calendar-plus display-4"></i>
+                                        <p class="mt-2">No events added yet. Click "Add Event" or "Load Template" to start planning!</p>
+                                    </div>
+                                </div>
+                                
+                                <!-- Budget Summary -->
+                                <div class="row mt-3" id="budgetSummary" style="display: none;">
+                                    <div class="col-md-4">
+                                        <div class="card bg-light">
+                                            <div class="card-body text-center">
+                                                <h6>Events Total</h6>
+                                                <h4 id="eventsTotal" class="text-primary">$0.00</h4>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card bg-light">
+                                            <div class="card-body text-center">
+                                                <h6>Budget Remaining</h6>
+                                                <h4 id="budgetRemaining" class="text-success">${{ "{:,.2f}".format(budget_limit.amount) }}</h4>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card bg-light">
+                                            <div class="card-body text-center">
+                                                <h6>Events Count</h6>
+                                                <h4 id="eventsCount" class="text-info">0</h4>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Submit Buttons -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('spending_plans.list_spending_plans') }}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-success" id="submitBtn">
+                                <i class="bi bi-send"></i> Submit for Review
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Template Loading Modal -->
+<div class="modal fade" id="templateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-template"></i> {{ managed_category }} Event Template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3">These are suggested events for {{ managed_category }}. Select the ones you want to include:</p>
+                <div id="templateEvents"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="applyTemplateBtn">
+                    <i class="bi bi-check"></i> Add Selected Events
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let eventCounter = 0;
+    const maxBudget = {{ budget_limit.amount }};
+    const category = '{{ managed_category }}';
+    
+    const eventsContainer = document.getElementById('eventsContainer');
+    const emptyMessage = document.getElementById('emptyEventsMessage');
+    const budgetSummary = document.getElementById('budgetSummary');
+    const eventCountInput = document.getElementById('eventCount');
+    const totalBudgetInput = document.getElementById('total_budget');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    // Character counter for description
+    const descTextarea = document.getElementById('description');
+    const charCount = document.getElementById('descCharCount');
+    
+    descTextarea.addEventListener('input', function() {
+        const count = this.value.length;
+        charCount.textContent = count + '/1000';
+        if (count > 900) {
+            charCount.classList.add('text-warning');
+        } else {
+            charCount.classList.remove('text-warning');
+        }
+    });
+    
+    // Add event functionality
+    document.getElementById('addEventBtn').addEventListener('click', function() {
+        addEvent();
+    });
+    
+    // Template loading
+    document.getElementById('loadTemplateBtn').addEventListener('click', function() {
+        loadTemplate();
+    });
+    
+    function addEvent(eventData = {}) {
+        const eventDiv = document.createElement('div');
+        eventDiv.className = 'event-item border rounded p-3 mb-3';
+        eventDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <h6 class="mb-0">Event #${eventCounter + 1}</h6>
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeEvent(this)">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <label class="form-label">Event Name *</label>
+                    <input type="text" class="form-control event-name" name="event_name_${eventCounter}" 
+                           value="${eventData.name || ''}" placeholder="Event name" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Date *</label>
+                    <input type="date" class="form-control event-date" name="event_date_${eventCounter}" 
+                           value="${eventData.date || ''}" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Budget *</label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control event-budget" name="event_budget_${eventCounter}" 
+                               value="${eventData.budget || ''}" step="0.01" min="0" placeholder="0.00" required>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-12">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" name="event_description_${eventCounter}" rows="2" 
+                              placeholder="Brief description of the event...">${eventData.description || ''}</textarea>
+                </div>
+            </div>
+        `;
+        
+        if (emptyMessage.style.display !== 'none') {
+            emptyMessage.style.display = 'none';
+            budgetSummary.style.display = 'block';
+        }
+        
+        eventsContainer.appendChild(eventDiv);
+        
+        // Add event listeners
+        const budgetInput = eventDiv.querySelector('.event-budget');
+        budgetInput.addEventListener('input', updateBudgetSummary);
+        
+        eventCounter++;
+        eventCountInput.value = eventCounter;
+        updateBudgetSummary();
+    }
+    
+    window.removeEvent = function(button) {
+        button.closest('.event-item').remove();
+        updateBudgetSummary();
+        renumberEvents();
+        
+        if (eventsContainer.children.length === 1) { // Only empty message left
+            emptyMessage.style.display = 'block';
+            budgetSummary.style.display = 'none';
+        }
+    };
+    
+    function renumberEvents() {
+        const events = eventsContainer.querySelectorAll('.event-item');
+        events.forEach((event, index) => {
+            event.querySelector('h6').textContent = `Event #${index + 1}`;
+            
+            // Update input names
+            const inputs = event.querySelectorAll('input, textarea');
+            inputs.forEach(input => {
+                const baseName = input.name.replace(/_\d+$/, '');
+                input.name = `${baseName}_${index}`;
+            });
+        });
+        
+        eventCounter = events.length;
+        eventCountInput.value = eventCounter;
+    }
+    
+    function updateBudgetSummary() {
+        const budgetInputs = document.querySelectorAll('.event-budget');
+        let totalEvents = 0;
+        let validInputs = 0;
+        
+        budgetInputs.forEach(input => {
+            const value = parseFloat(input.value) || 0;
+            totalEvents += value;
+            if (value > 0) validInputs++;
+        });
+        
+        document.getElementById('eventsTotal').textContent = '$' + totalEvents.toFixed(2);
+        document.getElementById('eventsCount').textContent = validInputs;
+        
+        const totalBudget = parseFloat(totalBudgetInput.value) || 0;
+        const remaining = totalBudget - totalEvents;
+        const remainingEl = document.getElementById('budgetRemaining');
+        
+        remainingEl.textContent = '$' + remaining.toFixed(2);
+        remainingEl.className = remaining >= 0 ? 'text-success' : 'text-danger';
+        
+        // Validation
+        const isValid = Math.abs(remaining) < 0.01 && totalBudget > 0 && validInputs > 0;
+        submitBtn.disabled = !isValid;
+        
+        if (remaining < -0.01) {
+            remainingEl.parentElement.parentElement.classList.add('border-danger');
+        } else {
+            remainingEl.parentElement.parentElement.classList.remove('border-danger');
+        }
+    }
+    
+    // Update budget when total budget changes
+    totalBudgetInput.addEventListener('input', updateBudgetSummary);
+    
+    function loadTemplate() {
+        fetch(`/spending-plans/api/template/${category}`)
+            .then(response => response.json())
+            .then(data => {
+                const templateContainer = document.getElementById('templateEvents');
+                templateContainer.innerHTML = '';
+                
+                if (data.suggested_events && data.suggested_events.length > 0) {
+                    data.suggested_events.forEach((event, index) => {
+                        const eventCard = document.createElement('div');
+                        eventCard.className = 'form-check border rounded p-3 mb-2';
+                        eventCard.innerHTML = `
+                            <div class="d-flex justify-content-between">
+                                <div class="form-check-label flex-grow-1">
+                                    <input class="form-check-input me-2" type="checkbox" value="${index}" id="template_${index}">
+                                    <strong>${event.name}</strong>
+                                    <div class="text-muted small">${event.description}</div>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-primary">$${event.typical_budget}</span>
+                                </div>
+                            </div>
+                        `;
+                        templateContainer.appendChild(eventCard);
+                    });
+                    
+                    // Show modal
+                    new bootstrap.Modal(document.getElementById('templateModal')).show();
+                    
+                    // Apply template button
+                    document.getElementById('applyTemplateBtn').onclick = function() {
+                        const checkedBoxes = templateContainer.querySelectorAll('input[type="checkbox"]:checked');
+                        checkedBoxes.forEach(checkbox => {
+                            const eventIndex = parseInt(checkbox.value);
+                            const eventData = data.suggested_events[eventIndex];
+                            addEvent({
+                                name: eventData.name,
+                                budget: eventData.typical_budget,
+                                description: eventData.description,
+                                date: ''
+                            });
+                        });
+                        bootstrap.Modal.getInstance(document.getElementById('templateModal')).hide();
+                    };
+                } else {
+                    templateContainer.innerHTML = '<p class="text-muted">No template available for this category.</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error loading template:', error);
+                alert('Error loading template');
+            });
+    }
+    
+    // Form submission validation
+    document.getElementById('spendingPlanForm').addEventListener('submit', function(e) {
+        const events = eventsContainer.querySelectorAll('.event-item').length;
+        if (events === 0) {
+            e.preventDefault();
+            alert('Please add at least one event to your spending plan.');
+            return;
+        }
+        
+        const totalBudget = parseFloat(totalBudgetInput.value) || 0;
+        const budgetInputs = document.querySelectorAll('.event-budget');
+        let totalEvents = 0;
+        
+        budgetInputs.forEach(input => {
+            totalEvents += parseFloat(input.value) || 0;
+        });
+        
+        if (Math.abs(totalBudget - totalEvents) > 0.01) {
+            e.preventDefault();
+            alert('Total budget must equal the sum of all event budgets.');
+            return;
+        }
+        
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="spinner-border spinner-border-sm me-2"></i>Submitting...';
+    });
+});
+</script>
+{% endblock %}

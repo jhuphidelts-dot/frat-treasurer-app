@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Fraternity Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .register-container {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 2rem 0;
+        }
+        .register-card {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+            border: none;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(45deg, #5a6fd8, #6a4190);
+            transform: translateY(-1px);
+        }
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        .fraternity-logo {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+        }
+        .password-strength {
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+        .strength-weak { color: #dc3545; }
+        .strength-medium { color: #ffc107; }
+        .strength-strong { color: #28a745; }
+        
+        .phone-availability {
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+        .available { color: #28a745; }
+        .unavailable { color: #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="register-container d-flex align-items-center justify-content-center">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-md-8 col-lg-6">
+                    <div class="card register-card">
+                        <div class="card-body p-5">
+                            <!-- Logo -->
+                            <div class="fraternity-logo">
+                                <i class="bi bi-person-plus text-white fs-4"></i>
+                            </div>
+                            
+                            <!-- Title -->
+                            <h3 class="text-center mb-3 fw-bold text-dark">Create Your Account</h3>
+                            <p class="text-center text-muted mb-4">
+                                Join the fraternity portal - your account will be reviewed by the treasurer
+                            </p>
+                            
+                            <!-- Flash Messages -->
+                            {% with messages = get_flashed_messages(with_categories=true) %}
+                                {% if messages %}
+                                    {% for category, message in messages %}
+                                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                            {{ message }}
+                                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                        </div>
+                                    {% endfor %}
+                                {% endif %}
+                            {% endwith %}
+                            
+                            <!-- Registration Form -->
+                            <form method="POST" id="registerForm">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="first_name" class="form-label">
+                                                <i class="bi bi-person"></i> First Name *
+                                            </label>
+                                            <input type="text" class="form-control" id="first_name" name="first_name" 
+                                                   placeholder="John" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="last_name" class="form-label">
+                                                <i class="bi bi-person"></i> Last Name *
+                                            </label>
+                                            <input type="text" class="form-control" id="last_name" name="last_name" 
+                                                   placeholder="Doe" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="phone" class="form-label">
+                                        <i class="bi bi-phone"></i> Phone Number *
+                                    </label>
+                                    <input type="tel" class="form-control" id="phone" name="phone" 
+                                           placeholder="(555) 123-4567" required>
+                                    <div class="form-text">This will be your username for logging in</div>
+                                    <div id="phoneAvailability" class="phone-availability"></div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="email" class="form-label">
+                                        <i class="bi bi-envelope"></i> Email Address
+                                    </label>
+                                    <input type="email" class="form-control" id="email" name="email" 
+                                           placeholder="john.doe@example.com">
+                                    <div class="form-text">Optional - for account notifications</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="password" class="form-label">
+                                        <i class="bi bi-lock"></i> Password *
+                                    </label>
+                                    <div class="input-group">
+                                        <input type="password" class="form-control" id="password" 
+                                               name="password" placeholder="Create a secure password" required>
+                                        <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                            <i class="bi bi-eye" id="toggleIcon"></i>
+                                        </button>
+                                    </div>
+                                    <div id="passwordStrength" class="password-strength"></div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <label for="confirm_password" class="form-label">
+                                        <i class="bi bi-lock-fill"></i> Confirm Password *
+                                    </label>
+                                    <input type="password" class="form-control" id="confirm_password" 
+                                           name="confirm_password" placeholder="Confirm your password" required>
+                                    <div id="passwordMatch" class="password-strength"></div>
+                                </div>
+                                
+                                <!-- Terms and Info -->
+                                <div class="mb-4">
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle"></i>
+                                        <strong>Account Approval Process:</strong><br>
+                                        Your account will be pending until approved by the treasurer. You'll be notified once your account is activated.
+                                    </div>
+                                </div>
+                                
+                                <div class="d-grid mb-3">
+                                    <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                        <i class="bi bi-person-check"></i> Create Account
+                                    </button>
+                                </div>
+                            </form>
+                            
+                            <!-- Login Link -->
+                            <div class="text-center">
+                                <p class="mb-2">Already have an account?</p>
+                                <a href="{{ url_for('auth.login') }}" class="btn btn-outline-primary">
+                                    <i class="bi bi-box-arrow-in-right"></i> Sign In
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let phoneCheckTimeout;
+        let isPhoneAvailable = false;
+        
+        // Phone number formatting
+        document.getElementById('phone').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            let formattedValue = '';
+            
+            if (value.length > 0) {
+                if (value.length <= 3) {
+                    formattedValue = `(${value}`;
+                } else if (value.length <= 6) {
+                    formattedValue = `(${value.slice(0,3)}) ${value.slice(3)}`;
+                } else {
+                    formattedValue = `(${value.slice(0,3)}) ${value.slice(3,6)}-${value.slice(6,10)}`;
+                }
+            }
+            
+            e.target.value = formattedValue;
+            
+            // Check phone availability after formatting
+            if (value.length === 10) {
+                clearTimeout(phoneCheckTimeout);
+                phoneCheckTimeout = setTimeout(() => {
+                    checkPhoneAvailability(value);
+                }, 500);
+            } else {
+                document.getElementById('phoneAvailability').innerHTML = '';
+                isPhoneAvailable = false;
+            }
+        });
+        
+        // Password visibility toggle
+        document.getElementById('togglePassword').addEventListener('click', function() {
+            const passwordInput = document.getElementById('password');
+            const toggleIcon = document.getElementById('toggleIcon');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.className = 'bi bi-eye-slash';
+            } else {
+                passwordInput.type = 'password';
+                toggleIcon.className = 'bi bi-eye';
+            }
+        });
+        
+        // Password strength checker
+        document.getElementById('password').addEventListener('input', function(e) {
+            const password = e.target.value;
+            const strengthDiv = document.getElementById('passwordStrength');
+            
+            if (password.length === 0) {
+                strengthDiv.innerHTML = '';
+                return;
+            }
+            
+            let strength = 0;
+            let feedback = [];
+            
+            if (password.length >= 8) strength += 1;
+            else feedback.push('at least 8 characters');
+            
+            if (/[A-Z]/.test(password)) strength += 1;
+            else feedback.push('uppercase letter');
+            
+            if (/[a-z]/.test(password)) strength += 1;
+            else feedback.push('lowercase letter');
+            
+            if (/\d/.test(password)) strength += 1;
+            else feedback.push('number');
+            
+            if (/[^A-Za-z0-9]/.test(password)) strength += 1;
+            else feedback.push('special character');
+            
+            let strengthText = '';
+            let strengthClass = '';
+            
+            if (strength < 2) {
+                strengthText = '❌ Weak password';
+                strengthClass = 'strength-weak';
+            } else if (strength < 4) {
+                strengthText = '⚠️ Medium password';
+                strengthClass = 'strength-medium';
+            } else {
+                strengthText = '✅ Strong password';
+                strengthClass = 'strength-strong';
+            }
+            
+            if (feedback.length > 0 && strength < 4) {
+                strengthText += ' - Need: ' + feedback.slice(0, 2).join(', ');
+            }
+            
+            strengthDiv.innerHTML = `<span class="${strengthClass}">${strengthText}</span>`;
+        });
+        
+        // Password confirmation checker
+        document.getElementById('confirm_password').addEventListener('input', function(e) {
+            const password = document.getElementById('password').value;
+            const confirmPassword = e.target.value;
+            const matchDiv = document.getElementById('passwordMatch');
+            
+            if (confirmPassword.length === 0) {
+                matchDiv.innerHTML = '';
+                return;
+            }
+            
+            if (password === confirmPassword) {
+                matchDiv.innerHTML = '<span class="available">✅ Passwords match</span>';
+            } else {
+                matchDiv.innerHTML = '<span class="unavailable">❌ Passwords do not match</span>';
+            }
+        });
+        
+        // Check phone availability
+        async function checkPhoneAvailability(phone) {
+            try {
+                const response = await fetch('/api/check-phone', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ phone: phone })
+                });
+                
+                const data = await response.json();
+                const availabilityDiv = document.getElementById('phoneAvailability');
+                
+                if (data.available) {
+                    availabilityDiv.innerHTML = '<span class="available">✅ Phone number is available</span>';
+                    isPhoneAvailable = true;
+                } else {
+                    availabilityDiv.innerHTML = '<span class="unavailable">❌ Phone number already registered</span>';
+                    isPhoneAvailable = false;
+                }
+            } catch (error) {
+                console.error('Error checking phone availability:', error);
+            }
+        }
+        
+        // Form validation
+        document.getElementById('registerForm').addEventListener('submit', function(e) {
+            const phone = document.getElementById('phone').value.replace(/\D/g, '');
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+            const firstName = document.getElementById('first_name').value.trim();
+            const lastName = document.getElementById('last_name').value.trim();
+            
+            let errors = [];
+            
+            if (!firstName || !lastName) {
+                errors.push('First and last name are required.');
+            }
+            
+            if (phone.length !== 10) {
+                errors.push('Please enter a valid 10-digit phone number.');
+            }
+            
+            if (!isPhoneAvailable) {
+                errors.push('Phone number is not available or has not been checked.');
+            }
+            
+            if (password.length < 8) {
+                errors.push('Password must be at least 8 characters long.');
+            }
+            
+            if (password !== confirmPassword) {
+                errors.push('Passwords do not match.');
+            }
+            
+            if (errors.length > 0) {
+                e.preventDefault();
+                alert(errors.join('\\n'));
+            }
+        });
+    </script>
+</body>
+</html>

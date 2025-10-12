@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Fraternity Treasurer Dashboard</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Enhanced UI CSS -->
+    <link href="{{ url_for('static', filename='css/enhanced-ui.css') }}" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --warning-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            --danger-gradient: linear-gradient(135deg, #ff6b6b 0%, #feca57 100%);
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        
+        .navbar {
+            background: var(--primary-gradient) !important;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+        }
+        
+        .dashboard-header {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            border-radius: 0 0 2rem 2rem;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(31, 38, 135, 0.5);
+        }
+        
+        .quick-actions {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .feature-card {
+            background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
+            border: none;
+            border-radius: 1rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+            margin-bottom: 1rem;
+        }
+        
+        .animated-counter {
+            font-weight: 700;
+            font-size: 2.5rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="{{ url_for('index') }}">
+                <i class="bi bi-bank2"></i> 
+                Fraternity Treasurer Pro
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('transactions') }}">
+                            <i class="bi bi-list-ul"></i> Transactions
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('reports.dashboard') }}">
+                            <i class="bi bi-graph-up"></i> Reports
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('notifications.dashboard') }}">
+                            <i class="bi bi-bell"></i> 
+                            Notifications
+                            <span class="badge bg-warning text-dark ms-1">3</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('export.export_dashboard') }}">
+                            <i class="bi bi-download"></i> Export Data
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-gear"></i> Management
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('budget_management') }}">
+                                <i class="bi bi-wallet2"></i> Budgets
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('semester_management') }}">
+                                <i class="bi bi-calendar3"></i> Semesters
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('spending_plans.list_spending_plans') }}">
+                                <i class="bi bi-clipboard-check"></i> Spending Plans
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+                
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i> {{ session.user }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{{ url_for('ai_assistant') }}">
+                                <i class="bi bi-robot"></i> AI Assistant
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('treasurer_setup') }}">
+                                <i class="bi bi-gear"></i> Settings
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                                <i class="bi bi-box-arrow-right"></i> Logout
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="display-5 fw-bold mb-2">
+                        <i class="bi bi-speedometer2"></i>
+                        Dashboard Overview
+                    </h1>
+                    <p class="lead opacity-90 mb-0">
+                        Manage your fraternity's finances with advanced tools and insights
+                    </p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="d-flex align-items-center justify-content-end">
+                        <div class="me-3">
+                            <small class="opacity-75">Current Semester</small>
+                            <div class="fw-bold">Fall 2024</div>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-light btn-icon" data-tooltip="Refresh Data">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                            <button class="btn btn-light btn-icon" data-tooltip="Export Report">
+                                <i class="bi bi-download"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <!-- Flash Messages with Enhanced Styling -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show slide-in-up" role="alert">
+                        <i class="bi bi-{{ 'exclamation-triangle' if category == 'error' else 'info-circle' }} me-2"></i>
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Enhanced Statistics Cards -->
+        <div class="row g-4 mb-4">
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card text-center">
+                    <div class="feature-icon mx-auto" style="background: var(--primary-gradient);">
+                        <i class="bi bi-people"></i>
+                    </div>
+                    <div class="animated-counter text-primary" data-target="{{ members|length if members else 0 }}">0</div>
+                    <h6 class="text-muted mb-0">Total Members</h6>
+                    <div class="progress-enhanced mt-2" data-show-label>
+                        <div class="progress-bar bg-primary" style="width: 100%" aria-valuenow="100"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card text-center">
+                    <div class="feature-icon mx-auto" style="background: var(--success-gradient);">
+                        <i class="bi bi-cash-stack"></i>
+                    </div>
+                    <div class="animated-counter text-success" data-target="{{ dues_summary.total_collected if dues_summary else 0 }}">0</div>
+                    <h6 class="text-muted mb-0">Dues Collected</h6>
+                    <div class="progress-enhanced mt-2" data-show-label>
+                        <div class="progress-bar bg-success" 
+                             style="width: {{ dues_summary.collection_rate if dues_summary else 0 }}%" 
+                             aria-valuenow="{{ dues_summary.collection_rate if dues_summary else 0 }}"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card text-center">
+                    <div class="feature-icon mx-auto" style="background: var(--warning-gradient);">
+                        <i class="bi bi-exclamation-triangle"></i>
+                    </div>
+                    <div class="animated-counter text-warning" data-target="{{ dues_summary.outstanding if dues_summary else 0 }}">0</div>
+                    <h6 class="text-muted mb-0">Outstanding Balance</h6>
+                    <div class="progress-enhanced mt-2" data-show-label>
+                        <div class="progress-bar bg-warning" 
+                             style="width: {{ (100 - dues_summary.collection_rate) if dues_summary else 0 }}%" 
+                             aria-valuenow="{{ (100 - dues_summary.collection_rate) if dues_summary else 0 }}"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card text-center">
+                    <div class="feature-icon mx-auto" style="background: var(--danger-gradient);">
+                        <i class="bi bi-graph-down"></i>
+                    </div>
+                    <div class="animated-counter text-info" data-target="12500">0</div>
+                    <h6 class="text-muted mb-0">Total Expenses</h6>
+                    <div class="progress-enhanced mt-2" data-show-label>
+                        <div class="progress-bar bg-info" style="width: 75%" aria-valuenow="75"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions Panel -->
+        <div class="quick-actions">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h5 class="mb-0">
+                        <i class="bi bi-lightning-charge text-warning"></i>
+                        Quick Actions
+                    </h5>
+                    <small class="text-muted">Frequently used operations</small>
+                </div>
+                <div class="col-md-6">
+                    <div class="btn-group w-100" role="group">
+                        <button class="btn btn-gradient-primary btn-icon" data-loading-button>
+                            <i class="bi bi-person-plus"></i>
+                            Add Member
+                        </button>
+                        <button class="btn btn-gradient-success btn-icon" data-loading-button>
+                            <i class="bi bi-cash-coin"></i>
+                            Record Payment
+                        </button>
+                        <button class="btn btn-gradient-danger btn-icon" onclick="sendBulkReminders()">
+                            <i class="bi bi-bell"></i>
+                            Send Reminders
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enhanced Feature Cards -->
+        <div class="row g-4 mb-4">
+            <!-- Member Management Card -->
+            <div class="col-lg-6 col-xl-4">
+                <div class="card feature-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="feature-icon" style="background: var(--primary-gradient);">
+                                <i class="bi bi-people-fill"></i>
+                            </div>
+                            <div class="ms-3">
+                                <h5 class="card-title mb-0">Member Management</h5>
+                                <small class="text-muted">Manage fraternity members</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Collapsible Add Member Form -->
+                        <div class="collapsible-section" data-expanded>
+                            <div class="collapsible-header">
+                                <span class="fw-semibold">Add New Member</span>
+                            </div>
+                            <div class="collapsible-content">
+                                <form method="POST" action="/add_member" data-enhanced-validation>
+                                    <div class="form-floating mb-3">
+                                        <input type="text" class="form-control" id="memberName" name="name" 
+                                               placeholder="Full Name" required data-field-name="Member name">
+                                        <label for="memberName">Full Name</label>
+                                    </div>
+                                    
+                                    <div class="form-floating mb-3">
+                                        <input type="text" class="form-control" id="memberContact" name="contact" 
+                                               placeholder="Phone or Email" required data-field-name="Contact information">
+                                        <label for="memberContact">Phone or Email</label>
+                                    </div>
+                                    
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <div class="form-floating">
+                                                <input type="number" class="form-control" id="duesAmount" name="dues_amount" 
+                                                       placeholder="Dues Amount" step="0.01" required data-field-name="Dues amount">
+                                                <label for="duesAmount">Dues Amount</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-floating">
+                                                <select class="form-select" id="paymentPlan" name="payment_plan" required>
+                                                    <option value="">Choose Plan</option>
+                                                    <option value="semester">Full Semester</option>
+                                                    <option value="monthly">Monthly (4 payments)</option>
+                                                    <option value="bimonthly">Bi-monthly (2 payments)</option>
+                                                </select>
+                                                <label for="paymentPlan">Payment Plan</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-gradient-primary w-100 btn-icon" data-loading-button>
+                                        <i class="bi bi-person-plus"></i>
+                                        Add Member
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid mt-3">
+                            <a href="/bulk_import" class="btn btn-outline-primary btn-icon">
+                                <i class="bi bi-upload"></i>
+                                Bulk Import Members
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Financial Overview Card -->
+            <div class="col-lg-6 col-xl-4">
+                <div class="card feature-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="feature-icon" style="background: var(--success-gradient);">
+                                <i class="bi bi-graph-up"></i>
+                            </div>
+                            <div class="ms-3">
+                                <h5 class="card-title mb-0">Financial Overview</h5>
+                                <small class="text-muted">Budget and spending insights</small>
+                            </div>
+                        </div>
+                        
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <div class="text-center p-3 rounded bg-light">
+                                    <div class="h4 text-success mb-0">85%</div>
+                                    <small class="text-muted">Collection Rate</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center p-3 rounded bg-light">
+                                    <div class="h4 text-primary mb-0">12</div>
+                                    <small class="text-muted">Categories</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Mini Chart -->
+                        <canvas id="miniFinancialChart" width="100" height="60"></canvas>
+                        
+                        <div class="d-grid gap-2 mt-3">
+                            <a href="{{ url_for('reports.dashboard') }}" class="btn btn-outline-success btn-icon">
+                                <i class="bi bi-graph-up"></i>
+                                View Full Reports
+                            </a>
+                            <a href="{{ url_for('budget_management') }}" class="btn btn-outline-secondary btn-icon">
+                                <i class="bi bi-wallet2"></i>
+                                Manage Budgets
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity Card -->
+            <div class="col-lg-12 col-xl-4">
+                <div class="card feature-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="feature-icon" style="background: var(--warning-gradient);">
+                                <i class="bi bi-clock-history"></i>
+                            </div>
+                            <div class="ms-3">
+                                <h5 class="card-title mb-0">Recent Activity</h5>
+                                <small class="text-muted">Latest transactions and updates</small>
+                            </div>
+                        </div>
+                        
+                        <div class="activity-feed">
+                            <div class="activity-item d-flex align-items-center mb-3">
+                                <div class="activity-icon bg-success text-white rounded-circle me-3">
+                                    <i class="bi bi-cash"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">Payment Received</div>
+                                    <small class="text-muted">John Doe paid $150.00</small>
+                                </div>
+                                <small class="text-muted">2h ago</small>
+                            </div>
+                            
+                            <div class="activity-item d-flex align-items-center mb-3">
+                                <div class="activity-icon bg-primary text-white rounded-circle me-3">
+                                    <i class="bi bi-person-plus"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">New Member Added</div>
+                                    <small class="text-muted">Jane Smith joined</small>
+                                </div>
+                                <small class="text-muted">5h ago</small>
+                            </div>
+                            
+                            <div class="activity-item d-flex align-items-center mb-3">
+                                <div class="activity-icon bg-warning text-white rounded-circle me-3">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">Overdue Notice</div>
+                                    <small class="text-muted">3 members have overdue payments</small>
+                                </div>
+                                <small class="text-muted">1d ago</small>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid mt-3">
+                            <a href="{{ url_for('transactions') }}" class="btn btn-outline-warning btn-icon">
+                                <i class="bi bi-list-ul"></i>
+                                View All Activity
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Process Flow Indicator -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title mb-4">
+                    <i class="bi bi-diagram-3"></i>
+                    Semester Progress
+                </h5>
+                
+                <div class="step-progress" data-active-step="3">
+                    <div class="step-progress-item">
+                        <div class="step-progress-circle"></div>
+                        <div class="step-title">Setup</div>
+                        <small class="text-muted">Member enrollment</small>
+                    </div>
+                    <div class="step-progress-item">
+                        <div class="step-progress-circle"></div>
+                        <div class="step-title">Collection</div>
+                        <small class="text-muted">Dues collection</small>
+                    </div>
+                    <div class="step-progress-item">
+                        <div class="step-progress-circle"></div>
+                        <div class="step-title">Management</div>
+                        <small class="text-muted">Active operations</small>
+                    </div>
+                    <div class="step-progress-item">
+                        <div class="step-progress-circle"></div>
+                        <div class="step-title">Reporting</div>
+                        <small class="text-muted">End of semester</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/enhanced-ui.js') }}"></script>
+    
+    <script>
+        // Initialize animations and enhanced features
+        document.addEventListener('DOMContentLoaded', function() {
+            // Animate counters
+            const ui = new EnhancedUI();
+            document.querySelectorAll('.animated-counter').forEach(counter => {
+                const target = parseInt(counter.getAttribute('data-target'));
+                ui.animateCounter(counter, target, 2000);
+            });
+            
+            // Initialize mini chart
+            initMiniChart();
+            
+            // Show welcome toast
+            setTimeout(() => {
+                EnhancedUI.showToast('Welcome back! Dashboard loaded successfully.', 'success', 4000);
+            }, 1000);
+        });
+        
+        function initMiniChart() {
+            const ctx = document.getElementById('miniFinancialChart');
+            if (!ctx) return;
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
+                    datasets: [{
+                        label: 'Collections',
+                        data: [65, 78, 85, 82, 90],
+                        borderColor: '#4facfe',
+                        backgroundColor: 'rgba(79, 172, 254, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    }
+                }
+            });
+        }
+        
+        function sendBulkReminders() {
+            const button = event.target.closest('button');
+            EnhancedUI.setLoading(button, true);
+            
+            fetch('{{ url_for("notifications.send_payment_reminders") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                EnhancedUI.setLoading(button, false);
+                if (data.success) {
+                    EnhancedUI.showToast(data.message, 'success');
+                } else {
+                    EnhancedUI.showToast(data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                EnhancedUI.setLoading(button, false);
+                EnhancedUI.showToast('Error sending reminders: ' + error.message, 'danger');
+            });
+        }
+    </script>
+</body>
+</html>

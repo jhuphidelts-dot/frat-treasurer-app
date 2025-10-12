@@ -1,0 +1,446 @@
+{% extends "base.html" %}
+
+{% block title %}Financial Reports & Analytics{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="bi bi-graph-up"></i> Financial Reports & Analytics</h1>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="bi bi-download"></i> Export Data
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="{{ url_for('reports.export_financial_summary') }}">
+                            <i class="bi bi-file-earmark-text"></i> Financial Summary (CSV)
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('reports.export_member_payments') }}">
+                            <i class="bi bi-people"></i> Member Payments (CSV)
+                        </a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Pills -->
+    <ul class="nav nav-pills mb-4" id="reportTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="overview-tab" data-bs-toggle="pill" data-bs-target="#overview" 
+                    type="button" role="tab">
+                <i class="bi bi-speedometer2"></i> Overview
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="budget-tab" data-bs-toggle="pill" data-bs-target="#budget" 
+                    type="button" role="tab">
+                <i class="bi bi-pie-chart"></i> Budget Analysis
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="payments-tab" data-bs-toggle="pill" data-bs-target="#payments" 
+                    type="button" role="tab">
+                <i class="bi bi-cash-coin"></i> Payment Trends
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="members-tab" data-bs-toggle="pill" data-bs-target="#members" 
+                    type="button" role="tab">
+                <i class="bi bi-people"></i> Member Analysis
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="reportTabsContent">
+        
+        <!-- Overview Tab -->
+        <div class="tab-pane fade show active" id="overview" role="tabpanel">
+            <div class="row">
+                <!-- Financial Summary Cards -->
+                <div class="col-md-3">
+                    <div class="card border-primary">
+                        <div class="card-body text-center">
+                            <i class="bi bi-people text-primary fs-1"></i>
+                            <h5 class="card-title mt-2">Total Members</h5>
+                            <h3 class="text-primary" id="totalMembers">Loading...</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-success">
+                        <div class="card-body text-center">
+                            <i class="bi bi-cash-stack text-success fs-1"></i>
+                            <h5 class="card-title mt-2">Collection Rate</h5>
+                            <h3 class="text-success" id="collectionRate">Loading...</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-warning">
+                        <div class="card-body text-center">
+                            <i class="bi bi-exclamation-triangle text-warning fs-1"></i>
+                            <h5 class="card-title mt-2">Outstanding</h5>
+                            <h3 class="text-warning" id="outstandingAmount">Loading...</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-info">
+                        <div class="card-body text-center">
+                            <i class="bi bi-graph-up text-info fs-1"></i>
+                            <h5 class="card-title mt-2">Budget Used</h5>
+                            <h3 class="text-info" id="budgetUtilization">Loading...</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <!-- Quick Links -->
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-lightning"></i> Quick Reports</h5>
+                        </div>
+                        <div class="card-body d-grid gap-2">
+                            <a href="{{ url_for('reports.financial_overview') }}" class="btn btn-outline-primary">
+                                <i class="bi bi-file-earmark-text"></i> Financial Overview
+                            </a>
+                            <a href="{{ url_for('reports.budget_analysis') }}" class="btn btn-outline-success">
+                                <i class="bi bi-pie-chart-fill"></i> Budget Analysis
+                            </a>
+                            <a href="{{ url_for('reports.payment_tracking') }}" class="btn btn-outline-info">
+                                <i class="bi bi-graph-up-arrow"></i> Payment Tracking
+                            </a>
+                            <a href="{{ url_for('reports.member_analysis') }}" class="btn btn-outline-warning">
+                                <i class="bi bi-people-fill"></i> Member Analysis
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Status Chart -->
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-pie-chart"></i> Payment Status Distribution</h5>
+                        </div>
+                        <div class="card-body">
+                            <div style="height: 300px;">
+                                <canvas id="paymentStatusChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Budget Analysis Tab -->
+        <div class="tab-pane fade" id="budget" role="tabpanel">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5><i class="bi bi-bar-chart"></i> Budget vs Actual Spending</h5>
+                            <small class="text-muted">Current Semester</small>
+                        </div>
+                        <div class="card-body">
+                            <div style="height: 400px;">
+                                <canvas id="budgetChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>Budget Analysis:</strong> Compare allocated budgets with actual spending across all categories.
+                        Green bars show available budget, blue bars show current spending.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Trends Tab -->
+        <div class="tab-pane fade" id="payments" role="tabpanel">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-graph-up"></i> Monthly Payment Collection Trends</h5>
+                        </div>
+                        <div class="card-body">
+                            <div style="height: 400px;">
+                                <canvas id="paymentTrendsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6><i class="bi bi-calendar-check"></i> Collection Insights</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted">Track payment collection patterns over time to identify trends and optimize collection strategies.</p>
+                            <ul class="list-unstyled">
+                                <li><i class="bi bi-check-circle text-success"></i> Peak collection months</li>
+                                <li><i class="bi bi-check-circle text-success"></i> Seasonal variations</li>
+                                <li><i class="bi bi-check-circle text-success"></i> Collection efficiency</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6><i class="bi bi-target"></i> Action Items</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-envelope"></i> Send Payment Reminders
+                                </button>
+                                <button class="btn btn-outline-success btn-sm">
+                                    <i class="bi bi-calendar-plus"></i> Schedule Collection Drive
+                                </button>
+                                <button class="btn btn-outline-info btn-sm">
+                                    <i class="bi bi-file-earmark"></i> Generate Collection Report
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Member Analysis Tab -->
+        <div class="tab-pane fade" id="members" role="tabpanel">
+            <div class="row">
+                <div class="col-12">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-construction"></i> 
+                        <strong>Member Analysis:</strong> This section provides detailed member financial analysis.
+                        <a href="{{ url_for('reports.member_analysis') }}" class="btn btn-sm btn-primary ms-2">
+                            View Full Report
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <i class="bi bi-check-circle-fill text-success fs-1"></i>
+                            <h6 class="mt-2">Paid Members</h6>
+                            <h4 class="text-success" id="paidMembers">Loading...</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <i class="bi bi-clock-fill text-warning fs-1"></i>
+                            <h6 class="mt-2">Partial Payments</h6>
+                            <h4 class="text-warning" id="partialMembers">Loading...</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <i class="bi bi-exclamation-circle-fill text-danger fs-1"></i>
+                            <h6 class="mt-2">No Payments</h6>
+                            <h4 class="text-danger" id="noPaymentMembers">Loading...</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let paymentStatusChart, budgetChart, paymentTrendsChart;
+    
+    // Load financial overview data
+    loadOverviewData();
+    
+    // Initialize charts when tabs are shown
+    document.getElementById('overview-tab').addEventListener('shown.bs.tab', function() {
+        if (!paymentStatusChart) {
+            initPaymentStatusChart();
+        }
+    });
+    
+    document.getElementById('budget-tab').addEventListener('shown.bs.tab', function() {
+        if (!budgetChart) {
+            initBudgetChart();
+        }
+    });
+    
+    document.getElementById('payments-tab').addEventListener('shown.bs.tab', function() {
+        if (!paymentTrendsChart) {
+            initPaymentTrendsChart();
+        }
+    });
+    
+    // Initialize overview chart on load
+    setTimeout(initPaymentStatusChart, 500);
+    
+    function loadOverviewData() {
+        // This would typically fetch data from API endpoints
+        // For now, we'll use placeholder data
+        document.getElementById('totalMembers').textContent = '45';
+        document.getElementById('collectionRate').textContent = '73%';
+        document.getElementById('outstandingAmount').textContent = '$12,450';
+        document.getElementById('budgetUtilization').textContent = '68%';
+        
+        // Load member status data
+        fetch('/reports/api/payment-status-data')
+            .then(response => response.json())
+            .then(data => {
+                const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+                document.getElementById('paidMembers').textContent = data.datasets[0].data[0] || '0';
+                document.getElementById('partialMembers').textContent = data.datasets[0].data[1] || '0';
+                document.getElementById('noPaymentMembers').textContent = data.datasets[0].data[2] || '0';
+            })
+            .catch(error => console.error('Error loading member data:', error));
+    }
+    
+    function initPaymentStatusChart() {
+        const ctx = document.getElementById('paymentStatusChart').getContext('2d');
+        
+        fetch('/reports/api/payment-status-data')
+            .then(response => response.json())
+            .then(data => {
+                paymentStatusChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: data,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                        return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('Error loading payment status data:', error);
+                ctx.fillText('Error loading data', 50, 50);
+            });
+    }
+    
+    function initBudgetChart() {
+        const ctx = document.getElementById('budgetChart').getContext('2d');
+        
+        fetch('/reports/api/budget-chart-data')
+            .then(response => response.json())
+            .then(data => {
+                budgetChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: data,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return '$' + value.toLocaleString();
+                                    }
+                                }
+                            }
+                        },
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
+                        }
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('Error loading budget data:', error);
+                ctx.fillText('Error loading data', 50, 50);
+            });
+    }
+    
+    function initPaymentTrendsChart() {
+        const ctx = document.getElementById('paymentTrendsChart').getContext('2d');
+        
+        fetch('/reports/api/payment-trends-data')
+            .then(response => response.json())
+            .then(data => {
+                paymentTrendsChart = new Chart(ctx, {
+                    type: 'line',
+                    data: data,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return '$' + value.toLocaleString();
+                                    }
+                                }
+                            }
+                        },
+                        elements: {
+                            point: {
+                                radius: 6,
+                                hoverRadius: 8
+                            }
+                        }
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('Error loading payment trends data:', error);
+                ctx.fillText('Error loading data', 50, 50);
+            });
+    }
+    
+    // Auto-refresh data every 5 minutes
+    setInterval(loadOverviewData, 300000);
+});
+</script>
+{% endblock %}
