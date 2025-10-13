@@ -1885,23 +1885,7 @@ def test_approval_notification():
 @app.route('/notifications')
 @require_auth
 def notifications_dashboard():
-    """Simple notifications dashboard"""
-    # Get recent reminders sent
-    recent_reminders = []
-    
-    # Get members with outstanding balances for potential reminders
-    members_need_reminder = []
-    for member_id, member in treasurer_app.members.items():
-        balance = treasurer_app.get_member_balance(member_id)
-        if balance > 0:
-            members_need_reminder.append({
-                'id': member_id,
-                'name': member.name,
-                'balance': balance,
-                'contact': member.contact,
-                'contact_type': member.contact_type
-            })
-    
+    """Notifications dashboard for approval requests"""
     # Check notification configuration status
     config = treasurer_app.treasurer_config
     email_configured = bool(config.smtp_username and config.smtp_password)
@@ -1914,9 +1898,11 @@ def notifications_dashboard():
         'treasurer_phone': config.phone
     }
     
+    # TODO: In the future, you could add pending approval requests here
+    # For example:
+    # pending_requests = get_pending_approval_requests()
+    
     return render_template('notifications_dashboard.html',
-                         members_need_reminder=members_need_reminder,
-                         recent_reminders=recent_reminders,
                          notification_status=notification_status)
 
 @app.route('/ai_assistant', methods=['GET', 'POST'])
