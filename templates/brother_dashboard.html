@@ -9,8 +9,11 @@
     <style>
         :root {
             --bg-color: #ffffff;
-            --text-color: #000000;
+            --bg-secondary: #f8f9fa;
+            --text-color: #212529;
+            --text-muted: #6c757d;
             --card-bg: #ffffff;
+            --card-header-bg: #f8f9fa;
             --border-color: #dee2e6;
             --navbar-bg: #0d6efd;
             --navbar-text: #ffffff;
@@ -18,31 +21,47 @@
             --input-border: #ced4da;
             --btn-primary-bg: #0d6efd;
             --btn-secondary-bg: #6c757d;
+            --shadow: rgba(0,0,0,0.15);
         }
         
         [data-theme="dark"] {
-            --bg-color: #1a1a1a;
-            --text-color: #ffffff;
-            --card-bg: #2d2d2d;
-            --border-color: #404040;
-            --navbar-bg: #0a4e99;
-            --navbar-text: #ffffff;
-            --input-bg: #2d2d2d;
-            --input-border: #404040;
-            --btn-primary-bg: #0a4e99;
-            --btn-secondary-bg: #4a4a4a;
+            --bg-color: #0d1117;
+            --bg-secondary: #161b22;
+            --text-color: #e6edf3;
+            --text-muted: #7d8590;
+            --card-bg: #21262d;
+            --card-header-bg: #2d333b;
+            --border-color: #30363d;
+            --navbar-bg: #1f2937;
+            --navbar-text: #e6edf3;
+            --input-bg: #0d1117;
+            --input-border: #30363d;
+            --btn-primary-bg: #238636;
+            --btn-secondary-bg: #6e7681;
+            --shadow: rgba(0,0,0,0.3);
         }
         
         body {
             background-color: var(--bg-color);
             color: var(--text-color);
-            transition: background-color 0.3s ease, color 0.3s ease;
+            transition: all 0.3s ease;
         }
         
         .card {
             background-color: var(--card-bg);
-            border-color: var(--border-color);
+            border: 1px solid var(--border-color);
             color: var(--text-color);
+            box-shadow: 0 0.125rem 0.25rem var(--shadow);
+        }
+        
+        .card-header {
+            background-color: var(--card-header-bg);
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+        
+        .text-muted {
+            color: var(--text-muted) !important;
         }
         
         .navbar-dark {

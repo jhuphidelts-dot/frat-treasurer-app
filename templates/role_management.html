@@ -9,39 +9,54 @@
     <style>
         :root {
             --bg-color: #ffffff;
-            --text-color: #000000;
+            --bg-secondary: #f8f9fa;
+            --text-color: #212529;
+            --text-muted: #6c757d;
             --card-bg: #ffffff;
+            --card-header-bg: #f8f9fa;
             --border-color: #dee2e6;
             --input-bg: #ffffff;
             --input-border: #ced4da;
             --btn-primary-bg: #0d6efd;
+            --shadow: rgba(0,0,0,0.15);
         }
         
         [data-theme="dark"] {
-            --bg-color: #1a1a1a;
-            --text-color: #ffffff;
-            --card-bg: #2d2d2d;
-            --border-color: #404040;
-            --input-bg: #2d2d2d;
-            --input-border: #404040;
-            --btn-primary-bg: #0a4e99;
+            --bg-color: #0d1117;
+            --bg-secondary: #161b22;
+            --text-color: #e6edf3;
+            --text-muted: #7d8590;
+            --card-bg: #21262d;
+            --card-header-bg: #2d333b;
+            --border-color: #30363d;
+            --input-bg: #0d1117;
+            --input-border: #30363d;
+            --btn-primary-bg: #238636;
+            --shadow: rgba(0,0,0,0.3);
         }
         
         body {
             background-color: var(--bg-color);
             color: var(--text-color);
-            transition: background-color 0.3s ease, color 0.3s ease;
+            transition: all 0.3s ease;
         }
         
         .card {
             background-color: var(--card-bg);
-            border-color: var(--border-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            box-shadow: 0 0.125rem 0.25rem var(--shadow);
+        }
+        
+        .card-header {
+            background-color: var(--card-header-bg);
+            border-bottom: 1px solid var(--border-color);
             color: var(--text-color);
         }
         
         .form-control, .form-select {
             background-color: var(--input-bg);
-            border-color: var(--input-border);
+            border: 1px solid var(--input-border);
             color: var(--text-color);
         }
         
@@ -49,10 +64,33 @@
             background-color: var(--input-bg);
             border-color: var(--btn-primary-bg);
             color: var(--text-color);
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        }
+        
+        [data-theme="dark"] .form-control:focus,
+        [data-theme="dark"] .form-select:focus {
+            box-shadow: 0 0 0 0.25rem rgba(35, 134, 54, 0.25);
         }
         
         .table {
             color: var(--text-color);
+        }
+        
+        .text-muted {
+            color: var(--text-muted) !important;
+        }
+        
+        .modal-content {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+        }
+        
+        .modal-header {
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .modal-footer {
+            border-top: 1px solid var(--border-color);
         }
         
         .navbar-dark {
@@ -128,7 +166,7 @@
             <div class="col-12">
                 <h3>Current Executive Board</h3>
                 <div class="row">
-                    {% set executive_roles = ['president', 'vice_president', 'social_chair', 'phi_ed_chair', 'brotherhood_chair', 'recruitment_chair'] %}
+                    {% set executive_roles = ['treasurer', 'president', 'vice_president', 'social_chair', 'phi_ed_chair', 'brotherhood_chair', 'recruitment_chair'] %}
                     {% for role in executive_roles %}
                         {% set role_member = None %}
                         {% for member_id, member in members.items() %}
@@ -141,7 +179,7 @@
                             <div class="card role-card h-100">
                                 <div class="card-body">
                                     <div class="d-flex align-items-center mb-3">
-                                        <div class="member-avatar bg-{% if role == 'president' %}primary{% elif role == 'vice_president' %}info{% else %}secondary{% endif %}">
+                                        <div class="member-avatar bg-{% if role == 'treasurer' %}success{% elif role == 'president' %}primary{% elif role == 'vice_president' %}info{% else %}secondary{% endif %}">
                                             {% if role_member %}
                                                 {{ role_member.name[0] }}
                                             {% else %}
@@ -216,7 +254,8 @@
                                         </td>
                                         <td>
                                             <span class="badge role-badge
-                                                {% if member.role == 'president' %}bg-primary
+                                                {% if member.role == 'treasurer' %}bg-success
+                                                {% elif member.role == 'president' %}bg-primary
                                                 {% elif member.role == 'vice_president' %}bg-info
                                                 {% elif member.role in ['social_chair', 'phi_ed_chair', 'brotherhood_chair', 'recruitment_chair'] %}bg-secondary
                                                 {% else %}bg-light text-dark{% endif %}">
@@ -304,15 +343,16 @@
                         <input type="hidden" name="member_id" id="changeMemberId">
                         <div class="mb-3">
                             <label class="form-label">New Role:</label>
-                            <select class="form-select" name="role" id="changeRoleSelect" required>
-                                <option value="brother">Brother</option>
-                                <option value="president">President</option>
-                                <option value="vice_president">Vice President</option>
-                                <option value="social_chair">Social Chair</option>
-                                <option value="phi_ed_chair">Phi Ed Chair</option>
-                                <option value="brotherhood_chair">Brotherhood Chair</option>
-                                <option value="recruitment_chair">Recruitment Chair</option>
-                            </select>
+                                            <select class="form-select" name="role" id="changeRoleSelect" required>
+                                                <option value="brother">Brother</option>
+                                                <option value="treasurer">Treasurer</option>
+                                                <option value="president">President</option>
+                                                <option value="vice_president">Vice President</option>
+                                                <option value="social_chair">Social Chair</option>
+                                                <option value="phi_ed_chair">Phi Ed Chair</option>
+                                                <option value="brotherhood_chair">Brotherhood Chair</option>
+                                                <option value="recruitment_chair">Recruitment Chair</option>
+                                            </select>
                         </div>
                     </div>
                     <div class="modal-footer">

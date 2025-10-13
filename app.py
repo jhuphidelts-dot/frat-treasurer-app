@@ -256,6 +256,20 @@ MEMBER_ROLE_PERMISSIONS = {
         'record_payments': False,
         'manage_budgets': False,
         'assign_roles': False,
+    },
+    'treasurer': {
+        # Treasurer access - same as admin but assigned as member role
+        'view_all_data': True,
+        'edit_all_data': True,
+        'manage_users': True,
+        'send_reminders': True,
+        'add_transactions': True,
+        'edit_transactions': True,
+        'add_members': True,
+        'edit_members': True,
+        'record_payments': True,
+        'manage_budgets': True,
+        'assign_roles': True,
     }
 }
 
@@ -2518,10 +2532,19 @@ def get_ai_response(message):
     # Default response
     return "💡 **Common Questions:**\n• 'Email not working' - Email troubleshooting\n• 'How to add members' - Member management help\n• 'Setup help' - Configuration guidance\n• 'SMS issues' - Text message problems\n• 'Export data' - Backup and export help\n\n**Tip:** Be specific about your issue for better help!"
 
+# This app is designed to run exclusively on cloud platforms (Render.com)
+# Local development has been disabled - use the live deployment only
 if __name__ == '__main__':
-    import os
-    # Use port from environment (Replit sets this automatically)
-    port = int(os.environ.get('PORT', 8080))
-    debug = os.environ.get('DEBUG', 'False').lower() == 'true'
-    # Use 0.0.0.0 for Replit compatibility
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    print("\n❌ LOCAL HOSTING DISABLED")
+    print("\n🚀 This app runs exclusively on Render.com")
+    print("\n📋 To access your app:")
+    print("   1. Visit your Render dashboard: https://render.com/dashboard")
+    print("   2. Find your frat-treasurer-app service")
+    print("   3. Use the provided URL to access your live app")
+    print("\n💡 All changes are automatically deployed when pushed to GitHub")
+    print("\n⚠️  If you need to make changes:")
+    print("   1. Edit code locally")
+    print("   2. Commit changes: git add . && git commit -m 'description'")
+    print("   3. Push to deploy: git push origin main")
+    print("\n🔒 Local hosting permanently disabled for security")
+    exit(1)

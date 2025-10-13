@@ -89,6 +89,7 @@
                                         <label for="role" class="form-label">Fraternity Role</label>
                                         <select class="form-control" id="role" name="role">
                                             <option value="brother" {{ 'selected' if member.role == 'brother' or not member.role }}>Brother</option>
+                                            <option value="treasurer" {{ 'selected' if member.role == 'treasurer' }}>Treasurer</option>
                                             <option value="president" {{ 'selected' if member.role == 'president' }}>President</option>
                                             <option value="vice_president" {{ 'selected' if member.role == 'vice_president' }}>Vice President</option>
                                             <option value="social_chair" {{ 'selected' if member.role == 'social_chair' }}>Social Chair</option>
