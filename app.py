@@ -387,7 +387,7 @@ def require_permission(permission_name):
         def decorated_function(*args, **kwargs):
             if not has_permission(permission_name):
                 flash(f'You do not have permission to {permission_name.replace("_", " ")}. This action is restricted to treasurers only.', 'error')
-                return redirect(url_for('index'))
+                return redirect(url_for('dashboard'))
             return f(*args, **kwargs)
         return decorated_function
     return decorator
@@ -2263,7 +2263,7 @@ def handover_treasurer():
     treasurer_app.save_data(treasurer_app.semesters_file, treasurer_app.semesters)
     
     flash('Treasurer handover completed! Please provide setup instructions to the new treasurer.')
-    return redirect(url_for('index'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/optimize_storage')
 @require_auth
@@ -2275,7 +2275,7 @@ def optimize_storage():
         flash('Storage optimization completed successfully! Temporary files removed and data compressed.')
     except Exception as e:
         flash(f'Optimization failed: {e}')
-    return redirect(url_for('index'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/semester_management', methods=['GET', 'POST'])
 @require_auth
@@ -2316,13 +2316,13 @@ def preview_role(role_name):
     # Check if user is treasurer/admin
     if session.get('user') != 'admin':  # Only admin can preview roles
         flash('Only treasurers can preview other roles.')
-        return redirect(url_for('index'))
+        return redirect(url_for('dashboard'))
     
     # Valid roles for preview
     valid_roles = ['president', 'vice_president', 'social_chair', 'phi_ed_chair', 'recruitment_chair', 'brotherhood_chair', 'brother']
     if role_name not in valid_roles:
         flash('Invalid role for preview.')
-        return redirect(url_for('index'))
+        return redirect(url_for('dashboard'))
     
     # Store current role in session for restoration
     session['preview_mode'] = True
@@ -2334,7 +2334,7 @@ def preview_role(role_name):
     # Redirect based on role type
     if role_name in ['president', 'vice_president']:
         # Presidents/VPs see restricted treasurer dashboard
-        return redirect(url_for('index'))
+        return redirect(url_for('dashboard'))
     else:
         # Brothers and chairs see brother dashboard
         return redirect(url_for('brother_dashboard_preview', role_name=role_name))
@@ -2348,7 +2348,7 @@ def exit_preview():
         del session['preview_role']
         del session['original_role']
         flash('Exited preview mode. Back to treasurer view.')
-    return redirect(url_for('index'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/test_sms')
 @require_auth
@@ -2423,7 +2423,7 @@ def submit_payment_plan():
     else:
         flash('Payment plan request submitted, but treasurer notification failed.')
     
-    return redirect(url_for('index'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/submit_reimbursement', methods=['POST'])
 @require_auth  
@@ -2440,7 +2440,7 @@ def submit_reimbursement():
     else:
         flash('Reimbursement request submitted, but treasurer notification failed.')
     
-    return redirect(url_for('index'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/test_approval_notification')
 @require_auth

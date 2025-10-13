@@ -29,7 +29,7 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
-            <a class="navbar-brand" href="{{ url_for('index') }}">
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
                 <i class="bi bi-bank2"></i> Fraternity Treasurer
             </a>
         </div>
@@ -40,7 +40,7 @@
             <div class="col-12">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h1><i class="bi bi-bell"></i> Send Payment Reminders</h1>
-                    <a href="{{ url_for('index') }}" class="btn btn-secondary">← Back to Dashboard</a>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">← Back to Dashboard</a>
                 </div>
 
                 <!-- Flash Messages -->
@@ -136,7 +136,7 @@
                         <p class="mb-0">No members currently have outstanding balances. All payment reminders are up to date!</p>
                     </div>
                     <div class="text-center mt-3">
-                        <a href="{{ url_for('index') }}" class="btn btn-primary">Return to Dashboard</a>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Return to Dashboard</a>
                     </div>
                 {% endif %}
             </div>
