@@ -58,15 +58,19 @@
                         <h5 class="mb-0"><i class="bi bi-phone"></i> SMS Configuration</h5>
                     </div>
                     <div class="card-body">
-                        {% if notification_status.sms_configured %}
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> SMS uses free email-to-SMS gateways
+                            <br><small>Works with all major carriers: Verizon, AT&T, T-Mobile, etc.</small>
+                        </div>
+                        {% if notification_status.treasurer_phone_configured %}
                             <div class="alert alert-success">
-                                <i class="bi bi-check-circle"></i> SMS is configured (Twilio)
-                                <br><small>Phone: {{ notification_status.twilio_phone }}</small>
+                                <i class="bi bi-check-circle"></i> Treasurer phone configured for notifications
+                                <br><small>Phone: {{ notification_status.treasurer_phone }}</small>
                             </div>
                         {% else %}
-                            <div class="alert alert-info">
-                                <i class="bi bi-info-circle"></i> SMS uses email-to-SMS gateways (free)
-                                <br><small>Configure Twilio in Treasurer Setup for premium SMS</small>
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle"></i> Treasurer phone not configured
+                                <br><small><a href="{{ url_for('treasurer_setup') }}">Add your phone in Treasurer Setup</a></small>
                             </div>
                         {% endif %}
                     </div>
@@ -156,6 +160,9 @@
                         <div class="d-flex flex-wrap gap-2">
                             <a href="{{ url_for('treasurer_setup') }}" class="btn btn-primary">
                                 <i class="bi bi-gear"></i> Configure Notifications
+                            </a>
+                            <a href="{{ url_for('test_sms') }}" class="btn btn-info">
+                                <i class="bi bi-phone-vibrate"></i> Test SMS to Treasurer
                             </a>
                             <a href="{{ url_for('selective_reminders') }}" class="btn btn-warning">
                                 <i class="bi bi-send"></i> Send Selective Reminders

@@ -1,10 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from datetime import datetime, timedelta
-import gspread
-from google.oauth2.service_account import Credentials
 import smtplib
 from email.mime.text import MIMEText
-from twilio.rest import Client
 import os
 from apscheduler.schedulers.background import BackgroundScheduler
 import json
@@ -17,9 +14,6 @@ from dotenv import load_dotenv
 import hashlib
 import re
 import calendar
-import gspread
-from google.oauth2.service_account import Credentials
-import pandas as pd
 
 # Import Flask blueprints
 # from notifications import notifications_bp  # Commented out due to compatibility issues
@@ -31,50 +25,89 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-me")  # needed for flash()
-SHEET_ID = "1im714pqV9b9jA6fQDH_GmIrpBwKm7IWViu27whK6aGo"
-SERVICE_FILE = os.path.join(os.path.dirname(__file__), "service_account.json")
 
 # Register blueprints
 # app.register_blueprint(notifications_bp)  # Commented out due to compatibility issues
 app.register_blueprint(export_bp)
 
-def export_to_google_sheet():
-    creds = Credentials.from_service_account_file(
-        SERVICE_FILE,
-        scopes=[
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive",
-        ],
-    )
-    client = gspread.authorize(creds)
-    sheet = client.open_by_key(SHEET_ID)
+# SMS Gateway mappings for email-to-SMS
+SMS_GATEWAYS = {
+    'verizon': '@vtext.com',
+    'att': '@txt.att.net', 
+    'tmobile': '@tmomail.net',
+    'sprint': '@messaging.sprintpcs.com',
+    'boost': '@smsmyboostmobile.com',
+    'cricket': '@sms.cricketwireless.net',
+    'uscellular': '@email.uscc.net',
+    'virgin': '@vmobl.com',
+    'metropcs': '@mymetropcs.com'
+}
 
-    # Brothers
-    with open("members.json", "r") as f:
-        members = json.load(f)
-    df_members = pd.DataFrame(members)
-    ws = sheet.worksheet("Brothers")
-    ws.clear()
-    ws.update([df_members.columns.tolist()] + df_members.values.tolist())
+def send_email_to_sms(phone, message, config):
+    """Send SMS via email-to-SMS gateway"""
+    if not config.smtp_username or not config.smtp_password:
+        return False
+    
+    # Clean phone number
+    clean_phone = ''.join(filter(str.isdigit, phone))
+    if len(clean_phone) == 11 and clean_phone.startswith('1'):
+        clean_phone = clean_phone[1:]  # Remove leading 1
+    elif len(clean_phone) != 10:
+        return False
+    
+    success_count = 0
+    # Try multiple carriers for better delivery
+    for carrier, gateway in SMS_GATEWAYS.items():
+        try:
+            sms_email = clean_phone + gateway
+            
+            msg = MIMEText(message)
+            msg['Subject'] = ''
+            msg['From'] = config.smtp_username
+            msg['To'] = sms_email
+            
+            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server.starttls()
+            server.login(config.smtp_username, config.smtp_password)
+            server.send_message(msg)
+            server.quit()
+            success_count += 1
+            
+        except Exception:
+            continue  # Try next gateway
+    
+    return success_count > 0
 
-    # Transactions
-    with open("transactions.json", "r") as f:
-        tx = json.load(f)
-    df_tx = pd.DataFrame(tx)
-    ws = sheet.worksheet("Transactions")
-    ws.clear()
-    ws.update([df_tx.columns.tolist()] + df_tx.values.tolist())
-
-    # Overview (budget)
-    with open("budget.json", "r") as f:
-        budget = json.load(f)
-    df_budget = pd.DataFrame(budget)
-    ws = sheet.worksheet("Overview")
-    ws.clear()
-    ws.update([df_budget.columns.tolist()] + df_budget.values.tolist())
-
-
-
+def notify_treasurer(message, config):
+    """Send notification to treasurer via SMS and email"""
+    if not config.name:
+        return False
+    
+    sent = False
+    
+    # Send email to treasurer
+    if config.email and config.smtp_username and config.smtp_password:
+        try:
+            msg = MIMEText(f"Fraternity Treasurer Alert:\n\n{message}")
+            msg['Subject'] = 'Fraternity Treasurer Alert'
+            msg['From'] = config.smtp_username
+            msg['To'] = config.email
+            
+            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server.starttls()
+            server.login(config.smtp_username, config.smtp_password)
+            server.send_message(msg)
+            server.quit()
+            sent = True
+        except Exception:
+            pass
+    
+    # Send SMS to treasurer
+    if config.phone:
+        if send_email_to_sms(config.phone, message, config):
+            sent = True
+    
+    return sent
 
 # Configuration
 BUDGET_CATEGORIES = [
@@ -127,14 +160,9 @@ class Semester:
 class TreasurerConfig:
     name: str = ""
     email: str = ""
-    phone: str = ""
+    phone: str = ""  # Treasurer's phone for notifications
     smtp_username: str = ""
     smtp_password: str = ""
-    twilio_sid: str = ""
-    twilio_token: str = ""
-    twilio_phone: str = ""
-    google_credentials_path: str = ""
-    google_sheets_id: str = ""
 
 class TreasurerApp:
     def __init__(self):
@@ -252,11 +280,6 @@ class TreasurerApp:
                     config.phone = config_data.get('phone', '')
                     config.smtp_username = config_data.get('smtp_username', '')
                     config.smtp_password = config_data.get('smtp_password', '')
-                    config.twilio_sid = config_data.get('twilio_sid', '')
-                    config.twilio_token = config_data.get('twilio_token', '')
-                    config.twilio_phone = config_data.get('twilio_phone', '')
-                    config.google_credentials_path = config_data.get('google_credentials_path', '')
-                    config.google_sheets_id = config_data.get('google_sheets_id', '')
             except Exception as e:
                 print(f"Error loading treasurer config: {e}")
         
@@ -265,16 +288,6 @@ class TreasurerApp:
             config.smtp_username = os.getenv('SMTP_USERNAME', '')
         if not config.smtp_password:
             config.smtp_password = os.getenv('SMTP_PASSWORD', '')
-        if not config.twilio_sid:
-            config.twilio_sid = os.getenv('TWILIO_ACCOUNT_SID', '')
-        if not config.twilio_token:
-            config.twilio_token = os.getenv('TWILIO_AUTH_TOKEN', '')
-        if not config.twilio_phone:
-            config.twilio_phone = os.getenv('TWILIO_PHONE_NUMBER', '')
-        if not config.google_credentials_path:
-            config.google_credentials_path = os.getenv('GOOGLE_CREDENTIALS_PATH', '')
-        if not config.google_sheets_id:
-            config.google_sheets_id = os.getenv('GOOGLE_SHEETS_ID', '')
         
         return config
     
@@ -852,6 +865,7 @@ class TreasurerApp:
         print(f"DEBUG: Checking {len(members_to_check)} members for reminders")
         
         reminders_sent = 0
+        members_contacted = []
         
         # Send reminders to members with outstanding balances
         for member_id, member in members_to_check.items():
@@ -862,14 +876,25 @@ class TreasurerApp:
                 print(f"DEBUG: Sending reminder to {member.name} ({member.contact_type}: {member.contact})")
                 message = f"Hi {member.name}! Your fraternity dues balance is ${balance:.2f}. Please pay via Zelle or Venmo. Thanks!"
                 
-                result = self.send_notification(member.contact, message, member.contact_type)
+                # Try enhanced email-to-SMS for phone contacts
+                if member.contact_type == 'phone':
+                    result = send_email_to_sms(member.contact, message, self.treasurer_config)
+                else:
+                    result = self.send_email(member.contact, "Fraternity Dues Reminder", message)
+                
                 if result:
                     reminders_sent += 1
+                    members_contacted.append(f"{member.name} (${balance:.2f})")
                     print(f"SUCCESS: Reminder sent to {member.name}")
                 else:
                     print(f"FAILED: Could not send reminder to {member.name}")
             else:
                 print(f"DEBUG: {member.name} has no outstanding balance, skipping")
+        
+        # Notify treasurer about the reminders sent
+        if reminders_sent > 0:
+            summary_message = f"Sent {reminders_sent} payment reminders:\n" + "\n".join(members_contacted)
+            notify_treasurer(summary_message, self.treasurer_config)
         
         print(f"DEBUG: Reminder check complete. {reminders_sent} reminders sent successfully.")
         return reminders_sent
@@ -1626,21 +1651,7 @@ def dues_summary_page():
                          dues_summary=dues_summary,
                          members=treasurer_app.members)
 
-@app.route('/sync_status')
-@require_auth
-def sync_status():
-    """Show Google Sheets sync status"""
-    credentials_path = os.getenv('GOOGLE_CREDENTIALS_PATH')
-    spreadsheet_id = os.getenv('GOOGLE_SHEETS_ID')
-    
-    status = {
-        'configured': bool(credentials_path and spreadsheet_id),
-        'credentials_exist': bool(credentials_path and os.path.exists(credentials_path)),
-        'credentials_path': credentials_path,
-        'spreadsheet_id': spreadsheet_id
-    }
-    
-    return jsonify(status)
+# Google Sheets sync functionality removed
 
 @app.route('/transactions')
 @require_auth
@@ -1664,14 +1675,7 @@ def transactions():
 
 # 4) ROUTES (make sure the route comes AFTER the function so Python knows it)
 
-@app.route("/export_to_sheet")
-def export_to_sheet():
-    try:
-        export_to_google_sheet()
-        flash("Exported data to Google Sheet successfully!")
-    except Exception as e:
-        flash(f"Export failed: {e}")
-    return redirect(url_for("index"))
+# Google Sheets export route removed
 
 @app.route('/treasurer_setup', methods=['GET', 'POST'])
 @require_auth
@@ -1683,14 +1687,9 @@ def treasurer_setup():
     config = treasurer_app.treasurer_config
     config.name = request.form.get('name', '')
     config.email = request.form.get('email', '')
-    config.phone = request.form.get('phone', '')
+    config.phone = request.form.get('phone', '')  # Treasurer's phone for SMS notifications
     config.smtp_username = request.form.get('smtp_username', '')
     config.smtp_password = request.form.get('smtp_password', '')
-    config.twilio_sid = request.form.get('twilio_sid', '')
-    config.twilio_token = request.form.get('twilio_token', '')
-    config.twilio_phone = request.form.get('twilio_phone', '')
-    config.google_credentials_path = request.form.get('google_credentials_path', '')
-    config.google_sheets_id = request.form.get('google_sheets_id', '')
     
     treasurer_app.save_treasurer_config()
     flash('Treasurer configuration updated successfully!')
@@ -1709,9 +1708,6 @@ def handover_treasurer():
     config.phone = ""
     config.smtp_username = ""
     config.smtp_password = ""
-    config.twilio_sid = ""
-    config.twilio_token = ""
-    config.twilio_phone = ""
     
     treasurer_app.save_treasurer_config()
     
@@ -1767,51 +1763,7 @@ def semester_management():
     flash(f'New semester {season} {year} created!')
     return redirect(url_for('semester_management'))
 
-@app.route('/export_improved_sheets')
-@require_auth
-def export_improved_sheets():
-    """Export data in improved Google Sheets format"""
-    try:
-        # Create formatted data for easy copy-paste
-        members_data = [['Name', 'Contact', 'Contact Type', 'Dues Amount', 'Total Paid', 'Balance', 'Status']]
-        for member in treasurer_app.members.values():
-            total_paid = sum(payment['amount'] for payment in member.payments_made)
-            balance = member.dues_amount - total_paid
-            status = 'Paid' if balance <= 0 else f'Owes ${balance:.2f}'
-            members_data.append([member.name, member.contact, member.contact_type, 
-                               f'${member.dues_amount:.2f}', f'${total_paid:.2f}', f'${balance:.2f}', status])
-        
-        transactions_data = [['Date', 'Category', 'Description', 'Amount', 'Type']]
-        for transaction in treasurer_app.transactions:
-            date_str = transaction.date[:10] if len(transaction.date) >= 10 else transaction.date
-            transactions_data.append([date_str, transaction.category, transaction.description,
-                                    f'${transaction.amount:.2f}', transaction.type.title()])
-        
-        budget_data = [['Category', 'Budget Limit', 'Spent', 'Remaining', 'Percent Used']]
-        budget_summary = treasurer_app.get_budget_summary()
-        for category, summary in budget_summary.items():
-            budget_data.append([category, f'${summary["budget_limit"]:.2f}', 
-                              f'${summary["spent"]:.2f}', f'${summary["remaining"]:.2f}',
-                              f'{summary["percent_used"]:.1f}%'])
-        
-        # Save to temporary files for easy access
-        import csv, tempfile, os
-        temp_dir = tempfile.gettempdir()
-        
-        with open(os.path.join(temp_dir, 'members_export.csv'), 'w', newline='') as f:
-            csv.writer(f).writerows(members_data)
-        with open(os.path.join(temp_dir, 'transactions_export.csv'), 'w', newline='') as f:
-            csv.writer(f).writerows(transactions_data)
-        with open(os.path.join(temp_dir, 'budget_export.csv'), 'w', newline='') as f:
-            csv.writer(f).writerows(budget_data)
-        
-        flash(f'Data exported successfully! CSV files saved to: {temp_dir}')
-        flash('Files: members_export.csv, transactions_export.csv, budget_export.csv')
-        
-    except Exception as e:
-        flash(f'Export failed: {e}')
-    
-    return redirect(url_for('index'))
+# Google Sheets export functionality removed
 
 @app.route('/preview_role/<role_name>')
 @require_auth
@@ -1847,6 +1799,24 @@ def exit_preview():
         flash('Exited preview mode. Back to treasurer view.')
     return redirect(url_for('index'))
 
+@app.route('/test_sms')
+@require_auth
+def test_sms():
+    """Test SMS functionality"""
+    config = treasurer_app.treasurer_config
+    if not config.phone:
+        flash('Please configure your phone number in Treasurer Setup first.')
+        return redirect(url_for('treasurer_setup'))
+    
+    test_message = "Test SMS from Fraternity Treasurer App - working correctly!"
+    
+    if send_email_to_sms(config.phone, test_message, config):
+        flash(f'Test SMS sent successfully to {config.phone}!')
+    else:
+        flash('Failed to send test SMS. Check your email configuration.')
+    
+    return redirect(url_for('notifications_dashboard'))
+
 @app.route('/notifications')
 @require_auth
 def notifications_dashboard():
@@ -1870,13 +1840,13 @@ def notifications_dashboard():
     # Check notification configuration status
     config = treasurer_app.treasurer_config
     email_configured = bool(config.smtp_username and config.smtp_password)
-    sms_configured = bool(config.twilio_sid and config.twilio_token)
+    treasurer_phone_configured = bool(config.phone)
     
     notification_status = {
         'email_configured': email_configured,
-        'sms_configured': sms_configured,
+        'treasurer_phone_configured': treasurer_phone_configured,
         'email_username': config.smtp_username,
-        'twilio_phone': config.twilio_phone
+        'treasurer_phone': config.phone
     }
     
     return render_template('notifications_dashboard.html',
@@ -1906,11 +1876,11 @@ def get_ai_response(message):
         return "📧 **Email Issues:**\n1. Go to Treasurer Setup → Email Configuration\n2. Verify Gmail username is correct\n3. Use Gmail **App Password**, not regular password\n4. Test with your own email first\n\n**Get App Password:** Google Account → Security → 2-Step Verification → App passwords"
     
     if 'sms' in message or 'text' in message:
-        return "📱 **SMS Issues:**\n1. SMS uses email-to-SMS gateways (free but slower)\n2. Try different carriers: Verizon, AT&T, T-Mobile\n3. Use format: +1234567890 (include +1)\n4. For reliable SMS, configure Twilio in Treasurer Setup\n\n**Test:** Send reminder to yourself first"
+        return "📱 **SMS Issues:**\n1. SMS uses free email-to-SMS gateways\n2. Works with all major carriers: Verizon, AT&T, T-Mobile\n3. Use format: +1234567890 (include +1)\n4. Test via Notifications → 'Test SMS to Treasurer'\n\n**Tip:** SMS delivery may take 1-2 minutes"
     
     # Setup help
     if 'setup' in message or 'configure' in message or 'install' in message:
-        return "⚙️ **Setup Guide:**\n1. **New Treasurer:** Login → Treasurer Setup → Configure credentials\n2. **Email:** Get Gmail App Password → Enter in Email Config\n3. **Handover:** Complete checklist → Click 'Complete Handover'\n4. **Backup:** Export to Google Sheets monthly\n\nNeed help with specific setup?"
+        return "⚙️ **Setup Guide:**\n1. **New Treasurer:** Login → Treasurer Setup → Configure credentials\n2. **Email:** Get Gmail App Password → Enter in Email Config\n3. **Phone:** Add your phone for SMS notifications\n4. **Test:** Use 'Test SMS to Treasurer' to verify setup\n\nNeed help with specific setup?"
     
     # Feature help
     if 'how to' in message or 'add member' in message:
@@ -1922,8 +1892,8 @@ def get_ai_response(message):
     if 'budget' in message or 'expense' in message:
         return "📊 **Budget & Expenses:**\n• **Set Budget:** Budget Management → Set limits per category\n• **Add Expense:** Dashboard → Add Transaction → Select 'Expense'\n• **Track Spending:** Budget Management shows % used\n• **Categories:** Executive, Social, Philanthropy, etc.\n\n**Monthly Reports:** Monthly Income page"
     
-    if 'export' in message or 'backup' in message or 'google sheets' in message:
-        return "📄 **Data Export & Backup:**\n• **CSV Export:** Semesters → 'Export Current Semester'\n• **Google Sheets:** Configure in Treasurer Setup first\n• **Manual Backup:** Copy entire app folder\n• **Handover:** All data preserved automatically\n\n**Tip:** Export monthly for backup!"
+    if 'export' in message or 'backup' in message:
+        return "📄 **Data Export & Backup:**\n• **CSV Export:** Export data to CSV files\n• **Manual Backup:** Copy entire app folder\n• **Handover:** All data preserved automatically\n• **Local Storage:** All data stored securely locally\n\n**Tip:** Regular backups ensure data safety!"
     
     if 'semester' in message or 'new year' in message:
         return "📅 **Semester Management:**\n• **New Semester:** Semesters → Create New Semester\n• **Auto-Archive:** Previous semester archived automatically\n• **View History:** All semesters page shows past terms\n• **Data:** All member/transaction data preserved\n\n**Best Practice:** Export data before creating new semester"
