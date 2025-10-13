@@ -78,72 +78,44 @@
             </div>
         </div>
 
-        <!-- Members Needing Reminders -->
+        <!-- Pending Approval Requests -->
         <div class="row">
             <div class="col-12">
                 <div class="card">
                     <div class="card-header bg-warning">
                         <h5 class="mb-0">
-                            <i class="bi bi-exclamation-circle"></i> 
-                            Members with Outstanding Balances ({{ members_need_reminder|length }})
+                            <i class="bi bi-clock-history"></i> 
+                            Pending Approval Requests
                         </h5>
                     </div>
                     <div class="card-body">
-                        {% if members_need_reminder %}
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Member</th>
-                                            <th>Contact</th>
-                                            <th>Type</th>
-                                            <th>Balance</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for member in members_need_reminder %}
-                                        <tr>
-                                            <td>
-                                                <strong>{{ member.name }}</strong>
-                                            </td>
-                                            <td>{{ member.contact }}</td>
-                                            <td>
-                                                <span class="badge bg-secondary">
-                                                    {{ member.contact_type.title() }}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <span class="text-danger fw-bold">
-                                                    ${{ "%.2f"|format(member.balance) }}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <a href="{{ url_for('member_details', member_id=member.id) }}" 
-                                                   class="btn btn-sm btn-outline-primary">
-                                                    <i class="bi bi-person"></i> View Details
-                                                </a>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                            
-                            <div class="mt-3">
-                                <a href="{{ url_for('selective_reminders') }}" class="btn btn-warning">
-                                    <i class="bi bi-send"></i> Send Selective Reminders
-                                </a>
-                                <a href="{{ url_for('send_reminders') }}" class="btn btn-danger">
-                                    <i class="bi bi-broadcast"></i> Send Reminders to All
-                                </a>
-                            </div>
-                        {% else %}
-                            <div class="alert alert-success">
-                                <i class="bi bi-check-circle"></i> 
-                                Great! All members are current on their dues.
-                            </div>
-                        {% endif %}
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> 
+                            <strong>This is where approval notifications work:</strong>
+                            <ul class="mt-2 mb-0">
+                                <li>When a brother submits a <strong>payment plan request</strong></li>
+                                <li>When a chair submits a <strong>reimbursement request</strong></li>
+                                <li>When someone submits a <strong>spending plan request</strong></li>
+                                <li>Any other requests that need <strong>treasurer approval</strong></li>
+                            </ul>
+                        </div>
+                        
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle"></i> 
+                            <strong>How it works:</strong>
+                            <ol class="mt-2 mb-0">
+                                <li>Brother/Chair submits request through the app</li>
+                                <li>You get <strong>instant SMS + email notification</strong></li>
+                                <li>You review and approve/deny in the app</li>
+                                <li>Submitter gets notified of your decision</li>
+                            </ol>
+                        </div>
+                        
+                        <div class="alert alert-light">
+                            <i class="bi bi-lightbulb"></i> 
+                            <strong>Note:</strong> This is different from payment reminders to brothers about their dues. 
+                            Those are handled through <a href="{{ url_for('selective_reminders') }}">Selective Reminders</a>.
+                        </div>
                     </div>
                 </div>
             </div>
@@ -162,7 +134,10 @@
                                 <i class="bi bi-gear"></i> Configure Notifications
                             </a>
                             <a href="{{ url_for('test_sms') }}" class="btn btn-info">
-                                <i class="bi bi-phone-vibrate"></i> Test SMS to Treasurer
+                                <i class="bi bi-phone-vibrate"></i> Test SMS System
+                            </a>
+                            <a href="{{ url_for('test_approval_notification') }}" class="btn btn-success">
+                                <i class="bi bi-bell"></i> Test Approval Notification
                             </a>
                             <a href="{{ url_for('selective_reminders') }}" class="btn btn-warning">
                                 <i class="bi bi-send"></i> Send Selective Reminders

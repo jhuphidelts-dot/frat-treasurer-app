@@ -405,11 +405,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        function syncToSheets() {
-            // This would trigger a sync - for now just show a message
-            alert('Syncing to Google Sheets... (This requires API setup)');
-        }
-
         // Auto-refresh budget data every 5 minutes
         setInterval(function() {
             fetch('/budget_summary')

@@ -78,7 +78,7 @@ def send_email_to_sms(phone, message, config):
     
     return success_count > 0
 
-def notify_treasurer(message, config):
+def notify_treasurer(message, config, notification_type="Alert"):
     """Send notification to treasurer via SMS and email"""
     if not config.name:
         return False
@@ -88,8 +88,8 @@ def notify_treasurer(message, config):
     # Send email to treasurer
     if config.email and config.smtp_username and config.smtp_password:
         try:
-            msg = MIMEText(f"Fraternity Treasurer Alert:\n\n{message}")
-            msg['Subject'] = 'Fraternity Treasurer Alert'
+            msg = MIMEText(f"Fraternity Treasurer {notification_type}:\n\n{message}")
+            msg['Subject'] = f'Fraternity Treasurer {notification_type}'
             msg['From'] = config.smtp_username
             msg['To'] = config.email
             
@@ -104,10 +104,26 @@ def notify_treasurer(message, config):
     
     # Send SMS to treasurer
     if config.phone:
-        if send_email_to_sms(config.phone, message, config):
+        sms_message = f"Treasurer {notification_type}: {message[:100]}..." if len(message) > 100 else f"Treasurer {notification_type}: {message}"
+        if send_email_to_sms(config.phone, sms_message, config):
             sent = True
     
     return sent
+
+def notify_payment_plan_request(member_name, plan_details, config):
+    """Notify treasurer about payment plan request"""
+    message = f"{member_name} has submitted a payment plan request:\n{plan_details}\n\nPlease review and approve in the app."
+    return notify_treasurer(message, config, "Payment Plan Request")
+
+def notify_reimbursement_request(submitter_name, amount, category, description, config):
+    """Notify treasurer about reimbursement request"""
+    message = f"{submitter_name} has submitted a reimbursement request:\n\nAmount: ${amount:.2f}\nCategory: {category}\nDescription: {description}\n\nPlease review and approve in the app."
+    return notify_treasurer(message, config, "Reimbursement Request")
+
+def notify_spending_plan_request(submitter_name, category, amount, description, config):
+    """Notify treasurer about spending plan request"""
+    message = f"{submitter_name} has submitted a spending plan request:\n\nCategory: {category}\nAmount: ${amount:.2f}\nDescription: {description}\n\nPlease review and approve in the app."
+    return notify_treasurer(message, config, "Spending Plan Request")
 
 # Configuration
 BUDGET_CATEGORIES = [
@@ -891,10 +907,10 @@ class TreasurerApp:
             else:
                 print(f"DEBUG: {member.name} has no outstanding balance, skipping")
         
-        # Notify treasurer about the reminders sent
-        if reminders_sent > 0:
-            summary_message = f"Sent {reminders_sent} payment reminders:\n" + "\n".join(members_contacted)
-            notify_treasurer(summary_message, self.treasurer_config)
+        # Optional: Notify treasurer about reminders sent (you can disable this if too many notifications)
+        # if reminders_sent > 0:
+        #     summary_message = f"Sent {reminders_sent} payment reminders:\n" + "\n".join(members_contacted)
+        #     notify_treasurer(summary_message, self.treasurer_config)
         
         print(f"DEBUG: Reminder check complete. {reminders_sent} reminders sent successfully.")
         return reminders_sent
@@ -1814,6 +1830,55 @@ def test_sms():
         flash(f'Test SMS sent successfully to {config.phone}!')
     else:
         flash('Failed to send test SMS. Check your email configuration.')
+    
+    return redirect(url_for('notifications_dashboard'))
+
+@app.route('/submit_payment_plan', methods=['POST'])
+@require_auth
+def submit_payment_plan():
+    """Brother submits a payment plan request (example route)"""
+    member_name = request.form.get('member_name', 'Unknown Member')
+    plan_details = request.form.get('plan_details', '')
+    
+    # Notify treasurer about the request
+    if notify_payment_plan_request(member_name, plan_details, treasurer_app.treasurer_config):
+        flash('Payment plan request submitted successfully! Treasurer has been notified.')
+    else:
+        flash('Payment plan request submitted, but treasurer notification failed.')
+    
+    return redirect(url_for('index'))
+
+@app.route('/submit_reimbursement', methods=['POST'])
+@require_auth  
+def submit_reimbursement():
+    """Submit a reimbursement request (example route)"""
+    submitter_name = request.form.get('submitter_name', session.get('user', 'Unknown'))
+    amount = float(request.form.get('amount', 0))
+    category = request.form.get('category', '')
+    description = request.form.get('description', '')
+    
+    # Notify treasurer about the request
+    if notify_reimbursement_request(submitter_name, amount, category, description, treasurer_app.treasurer_config):
+        flash('Reimbursement request submitted successfully! Treasurer has been notified.')
+    else:
+        flash('Reimbursement request submitted, but treasurer notification failed.')
+    
+    return redirect(url_for('index'))
+
+@app.route('/test_approval_notification')
+@require_auth
+def test_approval_notification():
+    """Test the approval notification system"""
+    config = treasurer_app.treasurer_config
+    if not config.phone and not config.email:
+        flash('Please configure your phone and/or email in Treasurer Setup first.')
+        return redirect(url_for('treasurer_setup'))
+    
+    # Send a test reimbursement request notification
+    if notify_reimbursement_request('John Doe (Test)', 75.50, 'Social', 'Test reimbursement notification - pizza for brotherhood event', config):
+        flash('Test approval notification sent successfully! Check your phone and email.')
+    else:
+        flash('Failed to send test approval notification. Check your configuration.')
     
     return redirect(url_for('notifications_dashboard'))
 
