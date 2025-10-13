@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}{{ primary_category }} Chair Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="bi bi-calendar-check"></i>
+                {{ primary_category }} Chair Dashboard
+            </h1>
+            <p class="text-muted">Manage your events and budget for {{ current_semester.name }}</p>
+        </div>
+    </div>
+
+    <!-- Budget Overview -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <h5 class="card-title">Budget Allocation</h5>
+                            <h3 class="mb-0">${{ "%.2f"|format(budget_limit.amount if budget_limit else 0) }}</h3>
+                        </div>
+                        <div class="col-md-3">
+                            <h5 class="card-title">Estimated Spending</h5>
+                            <h3 class="mb-0">${{ "%.2f"|format(total_estimated_cost) }}</h3>
+                        </div>
+                        <div class="col-md-3">
+                            <h5 class="card-title">Actual Spending</h5>
+                            <h3 class="mb-0">${{ "%.2f"|format(total_actual_cost) }}</h3>
+                        </div>
+                        <div class="col-md-3">
+                            <h5 class="card-title">Remaining</h5>
+                            <h3 class="mb-0">${{ "%.2f"|format((budget_limit.amount if budget_limit else 0) - total_actual_cost) }}</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-calendar-plus"></i>
+                        Events Management
+                    </h5>
+                    <p class="card-text">Create and manage your events for this semester.</p>
+                    <div class="btn-group" role="group">
+                        <a href="{{ url_for('chair.create_event') }}" class="btn btn-primary">
+                            <i class="bi bi-plus"></i> New Event
+                        </a>
+                        <a href="{{ url_for('chair.events_list') }}" class="btn btn-outline-primary">
+                            <i class="bi bi-list"></i> View All Events ({{ events|length }})
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-clipboard-data"></i>
+                        Spending Plans
+                    </h5>
+                    <p class="card-text">Create and track your budget spending plans.</p>
+                    <div class="btn-group" role="group">
+                        <a href="{{ url_for('chair.create_spending_plan') }}" class="btn btn-success">
+                            <i class="bi bi-plus"></i> New Plan
+                        </a>
+                        <a href="{{ url_for('chair.spending_plans_list') }}" class="btn btn-outline-success">
+                            <i class="bi bi-list"></i> View Plans ({{ spending_plans|length }})
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upcoming Events -->
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-calendar-event"></i>
+                        Upcoming Events
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if events %}
+                        <div class="list-group list-group-flush">
+                            {% for event in events[:5] %}
+                            <div class="list-group-item d-flex justify-content-between align-items-start">
+                                <div class="ms-2 me-auto">
+                                    <div class="fw-bold">{{ event.title }}</div>
+                                    {% if event.date %}
+                                        <small class="text-muted">
+                                            <i class="bi bi-calendar"></i>
+                                            {{ event.date.strftime('%B %d, %Y at %I:%M %p') }}
+                                        </small>
+                                    {% endif %}
+                                    {% if event.location %}
+                                        <br><small class="text-muted">
+                                            <i class="bi bi-geo-alt"></i>
+                                            {{ event.location }}
+                                        </small>
+                                    {% endif %}
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-{{ 'success' if event.status == 'completed' else 'primary' if event.status == 'approved' else 'secondary' }} rounded-pill">
+                                        {{ event.status.title() }}
+                                    </span>
+                                    <br><small class="text-muted">${{ "%.2f"|format(event.estimated_cost) }}</small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% if events|length > 5 %}
+                            <div class="text-center mt-3">
+                                <a href="{{ url_for('chair.events_list') }}" class="btn btn-outline-primary btn-sm">
+                                    View All {{ events|length }} Events
+                                </a>
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="bi bi-calendar-x display-4"></i>
+                            <p class="mt-2">No events created yet</p>
+                            <a href="{{ url_for('chair.create_event') }}" class="btn btn-primary">
+                                Create Your First Event
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Spending Plans -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clipboard-check"></i>
+                        Spending Plans
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if spending_plans %}
+                        {% for plan in spending_plans[:3] %}
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <strong>{{ plan.title }}</strong>
+                                    <span class="text-muted">${{ "%.0f"|format(plan.total_budget) }}</span>
+                                </div>
+                                <small class="text-muted">
+                                    Created {{ plan.created_at.strftime('%b %d') }}
+                                </small>
+                                <div class="mt-1">
+                                    {% if plan.treasurer_approved %}
+                                        <span class="badge bg-success">Treasurer Approved</span>
+                                    {% endif %}
+                                    {% if plan.president_approved %}
+                                        <span class="badge bg-info">President Approved</span>
+                                    {% endif %}
+                                    {% if plan.vp_approved %}
+                                        <span class="badge bg-warning">VP Approved</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if not loop.last %}<hr>{% endif %}
+                        {% endfor %}
+                        <div class="text-center mt-3">
+                            <a href="{{ url_for('chair.spending_plans_list') }}" class="btn btn-outline-success btn-sm">
+                                View All Plans
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted">
+                            <i class="bi bi-clipboard-x display-6"></i>
+                            <p class="mt-2">No spending plans yet</p>
+                            <a href="{{ url_for('chair.create_spending_plan') }}" class="btn btn-success btn-sm">
+                                Create Plan
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto-refresh budget data every 30 seconds
+setInterval(function() {
+    fetch('{{ url_for("chair.get_budget_remaining") }}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('Budget API error:', data.error);
+                return;
+            }
+            // Update budget display if needed
+            console.log('Budget updated:', data);
+        })
+        .catch(error => console.error('Budget fetch error:', error));
+}, 30000);
+</script>
+{% endblock %}

@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}Chair Spending Overview{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="bi bi-graph-up"></i>
+                Chair Spending Overview
+            </h1>
+            <p class="text-muted">Monitor chair budget usage and spending plans for {{ current_semester.name }}</p>
+        </div>
+    </div>
+
+    <!-- Budget Summary Cards -->
+    <div class="row mb-4">
+        {% for category_data in spending_overview %}
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">{{ category_data.category }}</h6>
+                    <span class="badge bg-secondary">{{ category_data.events_count }} events</span>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <strong>Chair:</strong> {{ category_data.chair_name }}
+                    </div>
+                    
+                    <!-- Budget Progress Bar -->
+                    <div class="mb-3">
+                        {% set percent_used = (category_data.total_actual / category_data.budget_amount * 100) if category_data.budget_amount > 0 else 0 %}
+                        <div class="d-flex justify-content-between text-sm mb-1">
+                            <span>Budget Used</span>
+                            <span>{{ "%.1f"|format(percent_used) }}%</span>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar 
+                                {% if percent_used <= 50 %}bg-success
+                                {% elif percent_used <= 75 %}bg-warning  
+                                {% else %}bg-danger{% endif %}" 
+                                role="progressbar" 
+                                style="width: {{ percent_used }}%">
+                            </div>
+                        </div>
+                        <small class="text-muted">
+                            ${{ "%.0f"|format(category_data.total_actual) }} / ${{ "%.0f"|format(category_data.budget_amount) }}
+                        </small>
+                    </div>
+
+                    <!-- Budget Breakdown -->
+                    <div class="small">
+                        <div class="d-flex justify-content-between">
+                            <span>Estimated:</span>
+                            <span>${{ "%.0f"|format(category_data.total_estimated) }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Actual:</span>
+                            <span>${{ "%.0f"|format(category_data.total_actual) }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between text-success">
+                            <strong>Remaining:</strong>
+                            <strong>${{ "%.0f"|format(category_data.remaining_budget) }}</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="row">
+                        <div class="col">
+                            <a href="{{ url_for('executive.category_detail', category=category_data.category) }}" 
+                               class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-eye"></i> View Details
+                            </a>
+                        </div>
+                        {% if category_data.spending_plans_count > 0 %}
+                        <div class="col-auto">
+                            <span class="badge bg-info">{{ category_data.spending_plans_count }} plans</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Recent Events Across All Categories -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-calendar-event"></i>
+                        Recent Events Across All Categories
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Event</th>
+                                    <th>Category</th>
+                                    <th>Chair</th>
+                                    <th>Date</th>
+                                    <th>Estimated Cost</th>
+                                    <th>Actual Cost</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for category_data in spending_overview %}
+                                    {% for event in category_data.events %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ event.title }}</strong>
+                                            {% if event.description %}
+                                                <br><small class="text-muted">{{ event.description[:50] }}...</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ category_data.category }}</span>
+                                        </td>
+                                        <td>{{ category_data.chair_name }}</td>
+                                        <td>
+                                            {% if event.date %}
+                                                {{ event.date.strftime('%m/%d/%Y') }}
+                                            {% else %}
+                                                <span class="text-muted">TBD</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>${{ "%.2f"|format(event.estimated_cost) }}</td>
+                                        <td>
+                                            {% if event.actual_cost %}
+                                                ${{ "%.2f"|format(event.actual_cost) }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{{ 'success' if event.status == 'completed' else 'primary' if event.status == 'approved' else 'warning' if event.status == 'planned' else 'secondary' }}">
+                                                {{ event.status.title() }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Spending Plans Summary -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clipboard-data"></i>
+                        Latest Spending Plans
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% set has_plans = spending_overview|selectattr('latest_spending_plan')|list|length > 0 %}
+                    {% if has_plans %}
+                        <div class="row">
+                            {% for category_data in spending_overview %}
+                                {% if category_data.latest_spending_plan %}
+                                    {% set plan = category_data.latest_spending_plan %}
+                                    <div class="col-md-6 col-lg-4 mb-3">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span class="badge bg-secondary">{{ category_data.category }}</span>
+                                                    <small class="text-muted">{{ plan.created_at.strftime('%m/%d') }}</small>
+                                                </div>
+                                            </div>
+                                            <div class="card-body">
+                                                <h6 class="card-title">{{ plan.title }}</h6>
+                                                <p class="card-text">
+                                                    <strong>Budget:</strong> ${{ "%.0f"|format(plan.total_budget) }}<br>
+                                                    <strong>Chair:</strong> {{ category_data.chair_name }}
+                                                </p>
+                                                <div class="mb-2">
+                                                    {% if plan.treasurer_approved %}
+                                                        <span class="badge bg-success">Treasurer ✓</span>
+                                                    {% endif %}
+                                                    {% if plan.president_approved %}
+                                                        <span class="badge bg-info">President ✓</span>
+                                                    {% endif %}
+                                                    {% if plan.vp_approved %}
+                                                        <span class="badge bg-warning">VP ✓</span>
+                                                    {% endif %}
+                                                </div>
+                                                <a href="{{ url_for('executive.view_spending_plan', plan_id=plan.id) }}" 
+                                                   class="btn btn-outline-primary btn-sm">
+                                                    View Details
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="bi bi-clipboard-x display-4"></i>
+                            <p class="mt-2">No spending plans submitted yet</p>
+                            <p class="text-sm">Chair spending plans will appear here once they're created.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto-refresh spending data every 60 seconds
+setInterval(function() {
+    window.location.reload();
+}, 60000);
+
+// Add category stats tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    const statsButtons = document.querySelectorAll('[data-category]');
+    statsButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const category = this.getAttribute('data-category');
+            fetch(`{{ url_for('executive.get_category_stats', category='CATEGORY') }}`.replace('CATEGORY', category))
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Category stats:', data);
+                    // Could show detailed popup/modal here
+                })
+                .catch(error => console.error('Stats fetch error:', error));
+        });
+    });
+});
+</script>
+{% endblock %}

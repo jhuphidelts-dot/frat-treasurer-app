@@ -9,8 +9,8 @@ from models import User, Role, Member
 
 # Define comprehensive permission structure
 ROLE_PERMISSIONS = {
-    'treasurer': {
-        # Full admin permissions
+    'admin': {
+        # System-level admin permissions (non-assignable)
         'view_all_data': True,
         'edit_all_data': True,
         'manage_users': True,
@@ -21,6 +21,49 @@ ROLE_PERMISSIONS = {
         'view_financial_reports': True,
         'manage_semesters': True,
         'system_administration': True,
+        'assign_treasurer': True,
+        
+        # Budget category permissions
+        'edit_executive_budget': True,
+        'edit_social_budget': True,
+        'edit_brotherhood_budget': True,
+        'edit_philanthropy_budget': True,
+        'edit_recruitment_budget': True,
+        'edit_phi_ed_budget': True,
+        'edit_housing_budget': True,
+        'edit_bank_budget': True,
+        
+        # Transaction permissions
+        'add_transactions': True,
+        'edit_transactions': True,
+        'delete_transactions': True,
+        'view_all_transactions': True,
+        
+        # Member management
+        'add_members': True,
+        'edit_members': True,
+        'delete_members': True,
+        'view_all_members': True,
+        'view_member_finances': True,
+        'record_payments': True,
+        
+        # Reimbursement permissions
+        'submit_reimbursement': True,
+        'approve_reimbursements': True,
+    },
+    
+    'treasurer': {
+        # Treasurer permissions (assignable by admin/current treasurer)
+        'view_all_data': True,
+        'edit_all_data': True,
+        'manage_users': True,
+        'manage_roles': True,
+        'approve_requests': True,
+        'manage_budgets': True,
+        'send_reminders': True,
+        'view_financial_reports': True,
+        'manage_semesters': True,
+        'assign_treasurer': True,
         
         # Budget category permissions
         'edit_executive_budget': True,
@@ -56,8 +99,10 @@ ROLE_PERMISSIONS = {
         'view_financial_reports': True,
         'view_all_transactions': True,
         'view_all_members': True,
+        'view_member_finances': True,
         'view_budgets': True,
         'view_all_budgets': True,
+        'view_chair_spending_plans': True,
         
         # Cannot edit, manage, or send anything
         'edit_all_data': False,
@@ -79,10 +124,17 @@ ROLE_PERMISSIONS = {
     },
     
     'vice_president': {
-        # View all budgets, edit specific categories
+        # View all budgets and chair spending plans
         'view_all_budgets': True,
+        'view_chair_spending_plans': True,
         'view_financial_reports': True,
         'view_transactions_filtered': True,
+        
+        # Can view members but not their financial info
+        'view_member_list': True,
+        'view_member_roles': True,
+        'view_member_contacts': True,
+        'view_member_finances': False,  # Hide dues, payments, balances
         
         # Can edit specific budget categories
         'edit_social_budget': True,
@@ -109,10 +161,16 @@ ROLE_PERMISSIONS = {
         'add_social_expenses': True,
         'view_social_transactions': True,
         
+        # Event and spending plan management
+        'create_events': True,
+        'edit_own_events': True,
+        'view_own_events': True,
+        'create_spending_plans': True,
+        'edit_own_spending_plans': True,
+        'view_own_spending_plans': True,
+        
         # Request permissions
         'submit_reimbursement': True,
-        'create_spending_plans': True,
-        'edit_spending_plans': True,
         
         # Limited member access
         'view_member_list': True,
@@ -128,10 +186,16 @@ ROLE_PERMISSIONS = {
         'add_phi_ed_expenses': True,
         'view_phi_ed_transactions': True,
         
+        # Event and spending plan management
+        'create_events': True,
+        'edit_own_events': True,
+        'view_own_events': True,
+        'create_spending_plans': True,
+        'edit_own_spending_plans': True,
+        'view_own_spending_plans': True,
+        
         # Request permissions
         'submit_reimbursement': True,
-        'create_spending_plans': True,
-        'edit_spending_plans': True,
         
         # Limited member access
         'view_member_list': True,
@@ -147,10 +211,16 @@ ROLE_PERMISSIONS = {
         'add_recruitment_expenses': True,
         'view_recruitment_transactions': True,
         
+        # Event and spending plan management
+        'create_events': True,
+        'edit_own_events': True,
+        'view_own_events': True,
+        'create_spending_plans': True,
+        'edit_own_spending_plans': True,
+        'view_own_spending_plans': True,
+        
         # Request permissions
         'submit_reimbursement': True,
-        'create_spending_plans': True,
-        'edit_spending_plans': True,
         
         # Limited member access
         'view_member_list': True,
@@ -166,10 +236,16 @@ ROLE_PERMISSIONS = {
         'add_brotherhood_expenses': True,
         'view_brotherhood_transactions': True,
         
+        # Event and spending plan management
+        'create_events': True,
+        'edit_own_events': True,
+        'view_own_events': True,
+        'create_spending_plans': True,
+        'edit_own_spending_plans': True,
+        'view_own_spending_plans': True,
+        
         # Request permissions
         'submit_reimbursement': True,
-        'create_spending_plans': True,
-        'edit_spending_plans': True,
         
         # Limited member access
         'view_member_list': True,
@@ -227,8 +303,8 @@ def has_permission(permission_name, user=None):
     if not user or not user.is_authenticated:
         return False
     
-    # Treasurer always has all permissions
-    if user.has_role('treasurer'):
+    # Admin and Treasurer always have all permissions
+    if user.has_role('admin') or user.has_role('treasurer'):
         return True
     
     user_permissions = get_user_permissions(user)

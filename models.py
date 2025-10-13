@@ -69,6 +69,7 @@ class User(UserMixin, db.Model):
         
         # Role hierarchy (highest to lowest)
         role_hierarchy = {
+            'admin': 8,
             'treasurer': 7,
             'president': 6,
             'vice_president': 5,
@@ -287,6 +288,33 @@ class ReimbursementRequest(db.Model):
     def __repr__(self):
         return f'<ReimbursementRequest ${self.amount} - {self.purpose}>'
 
+class Event(db.Model):
+    """Events planned by chairs"""
+    __tablename__ = 'events'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    category = db.Column(db.String(50), nullable=False)  # Social, Phi ED, Recruitment, Brotherhood
+    semester_id = db.Column(db.String(50), db.ForeignKey('semesters.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    date = db.Column(db.DateTime, nullable=True)
+    location = db.Column(db.String(200), nullable=True)
+    estimated_cost = db.Column(db.Float, nullable=False, default=0.0)
+    actual_cost = db.Column(db.Float, nullable=True)
+    max_attendees = db.Column(db.Integer, nullable=True)
+    status = db.Column(db.String(20), default='planned')  # planned, approved, cancelled, completed
+    notes = db.Column(db.Text, nullable=True)
+    spending_plan_id = db.Column(db.Integer, db.ForeignKey('spending_plans.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    creator = db.relationship('User', foreign_keys=[created_by], backref='created_events')
+    
+    def __repr__(self):
+        return f'<Event {self.title} - {self.category}>'
+
 class SpendingPlan(db.Model):
     """Semester spending plans submitted by officers"""
     __tablename__ = 'spending_plans'
@@ -296,12 +324,18 @@ class SpendingPlan(db.Model):
     category = db.Column(db.String(50), nullable=False)
     semester_id = db.Column(db.String(50), db.ForeignKey('semesters.id'), nullable=False)
     title = db.Column(db.String(100), nullable=False)
+    total_budget = db.Column(db.Float, nullable=False, default=0.0)
     plan_data = db.Column(db.Text, nullable=False)  # JSON with events, amounts, timeline
     version = db.Column(db.Integer, default=1)
     is_active = db.Column(db.Boolean, default=True)
     treasurer_approved = db.Column(db.Boolean, default=False)
+    president_approved = db.Column(db.Boolean, default=False)
+    vp_approved = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    events = db.relationship('Event', backref='spending_plan', lazy=True)
     
     def get_plan_data(self):
         return json.loads(self.plan_data) if self.plan_data else {}

@@ -18,6 +18,8 @@ import calendar
 # Import Flask blueprints
 # from notifications import notifications_bp  # Commented out due to compatibility issues
 from export_system import export_bp
+from chair_management import chair_bp
+from executive_views import exec_bp
 
 
 # Load environment variables
@@ -29,6 +31,8 @@ app.secret_key = os.environ.get("SECRET_KEY", "change-me")  # needed for flash()
 # Register blueprints
 # app.register_blueprint(notifications_bp)  # Commented out due to compatibility issues
 app.register_blueprint(export_bp)
+app.register_blueprint(chair_bp)
+app.register_blueprint(exec_bp)
 
 # SMS Gateway mappings for email-to-SMS (Updated and optimized)
 SMS_GATEWAYS = {
