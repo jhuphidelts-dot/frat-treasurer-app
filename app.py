@@ -1043,14 +1043,18 @@ class TreasurerApp:
             from_phone = os.getenv('TWILIO_PHONE_NUMBER')
             
             if all([account_sid, auth_token, from_phone]):
-                client = Client(account_sid, auth_token)
-                sms_message = client.messages.create(
-                    body=message,
-                    from_=from_phone,
-                    to=phone
-                )
-                print(f"SMS sent via Twilio to {phone}")
-                return True
+                try:
+                    from twilio.rest import Client
+                    client = Client(account_sid, auth_token)
+                    sms_message = client.messages.create(
+                        body=message,
+                        from_=from_phone,
+                        to=phone
+                    )
+                    print(f"SMS sent via Twilio to {phone}")
+                    return True
+                except ImportError:
+                    print("Twilio library not installed, skipping Twilio SMS")
         except Exception as e:
             print(f"Twilio SMS failed: {e}")
         
@@ -1798,35 +1802,17 @@ def send_reminders():
     try:
         print("\n🚀 Starting bulk reminder sending...")
         
-        # Add timeout protection
-        import signal
+        # Simple error handling without signal-based timeouts for cloud compatibility
+        reminders_sent = treasurer_app.check_and_send_reminders()
         
-        def timeout_handler(signum, frame):
-            raise TimeoutError("Reminder sending timed out")
-        
-        # Set 60 second timeout
-        signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(60)
-        
-        try:
-            reminders_sent = treasurer_app.check_and_send_reminders()
-            signal.alarm(0)  # Cancel timeout
-            
-            if reminders_sent > 0:
-                flash(f'✅ {reminders_sent} payment reminders sent successfully!', 'success')
-            else:
-                flash('ℹ️ No reminders needed - all members are paid up!', 'info')
-        except TimeoutError:
-            signal.alarm(0)  # Cancel timeout
-            flash('⏰ Reminder sending timed out. Try selective reminders for better control.', 'warning')
-        except Exception as e:
-            signal.alarm(0)  # Cancel timeout
-            print(f"Reminder error: {e}")
-            flash(f'❌ Error sending reminders: {str(e)}', 'error')
+        if reminders_sent > 0:
+            flash(f'✅ {reminders_sent} payment reminders sent successfully!', 'success')
+        else:
+            flash('ℹ️ No reminders needed - all members are paid up!', 'info')
             
     except Exception as e:
-        print(f"Outer reminder error: {e}")
-        flash('❌ Failed to send reminders. Check your email/SMS configuration.', 'error')
+        print(f"Reminder error: {e}")
+        flash(f'❌ Error sending reminders: {str(e)}. Try selective reminders for better control.', 'error')
     
     return redirect(url_for('dashboard'))
 
@@ -1859,35 +1845,17 @@ def selective_reminders():
     try:
         print(f"\n📱 Sending selective reminders to {len(selected_members)} members...")
         
-        # Add timeout protection for selective reminders too
-        import signal
+        # Simple error handling for cloud compatibility
+        reminders_sent = treasurer_app.check_and_send_reminders(selected_members)
         
-        def timeout_handler(signum, frame):
-            raise TimeoutError("Selective reminder sending timed out")
-        
-        # Set 30 second timeout (shorter for selective)
-        signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(30)
-        
-        try:
-            reminders_sent = treasurer_app.check_and_send_reminders(selected_members)
-            signal.alarm(0)  # Cancel timeout
-            
-            if reminders_sent > 0:
-                flash(f'✅ Reminders sent to {reminders_sent} selected member(s)!', 'success')
-            else:
-                flash('ℹ️ No reminders sent - check member balances.', 'info')
-        except TimeoutError:
-            signal.alarm(0)  # Cancel timeout
-            flash('⏰ Selective reminder sending timed out. Try fewer members at once.', 'warning')
-        except Exception as e:
-            signal.alarm(0)  # Cancel timeout
-            print(f"Selective reminder error: {e}")
-            flash(f'❌ Error sending selective reminders: {str(e)}', 'error')
+        if reminders_sent > 0:
+            flash(f'✅ Reminders sent to {reminders_sent} selected member(s)!', 'success')
+        else:
+            flash('ℹ️ No reminders sent - check member balances.', 'info')
             
     except Exception as e:
-        print(f"Outer selective reminder error: {e}")
-        flash('❌ Failed to send selective reminders. Check configuration.', 'error')
+        print(f"Selective reminder error: {e}")
+        flash(f'❌ Error sending selective reminders: {str(e)}', 'error')
     
     return redirect(url_for('dashboard'))
 
@@ -2772,16 +2740,25 @@ def get_ai_response(message):
 # This app is designed to run exclusively on cloud platforms (Render.com)
 # Local development has been disabled - use the live deployment only
 if __name__ == '__main__':
-    print("\n❌ LOCAL HOSTING DISABLED")
-    print("\n🚀 This app runs exclusively on Render.com")
-    print("\n📋 To access your app:")
-    print("   1. Visit your Render dashboard: https://render.com/dashboard")
-    print("   2. Find your frat-treasurer-app service")
-    print("   3. Use the provided URL to access your live app")
-    print("\n💡 All changes are automatically deployed when pushed to GitHub")
-    print("\n⚠️  If you need to make changes:")
-    print("   1. Edit code locally")
-    print("   2. Commit changes: git add . && git commit -m 'description'")
-    print("   3. Push to deploy: git push origin main")
-    print("\n🔒 Local hosting permanently disabled for security")
-    exit(1)
+    # Check if running on Render (cloud) or locally
+    is_render = os.environ.get('RENDER') or os.environ.get('PORT')
+    
+    if is_render:
+        # Running on Render - start the app normally
+        port = int(os.environ.get('PORT', 10000))
+        app.run(host='0.0.0.0', port=port)
+    else:
+        # Running locally - show deployment message and exit
+        print("\n❌ LOCAL HOSTING DISABLED")
+        print("\n🚀 This app runs exclusively on Render.com")
+        print("\n📋 To access your app:")
+        print("   1. Visit your Render dashboard: https://render.com/dashboard")
+        print("   2. Find your frat-treasurer-app service")
+        print("   3. Use the provided URL to access your live app")
+        print("\n💡 All changes are automatically deployed when pushed to GitHub")
+        print("\n⚠️  If you need to make changes:")
+        print("   1. Edit code locally")
+        print("   2. Commit changes: git add . && git commit -m 'description'")
+        print("   3. Push to deploy: git push origin main")
+        print("\n🔒 Local hosting permanently disabled for security")
+        exit(1)
