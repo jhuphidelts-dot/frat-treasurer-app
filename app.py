@@ -2388,6 +2388,85 @@ def verify_brothers():
     
     return redirect(url_for('verify_brothers'))
 
+@app.route('/role_management')
+@require_auth
+@require_permission('assign_roles')
+def role_management():
+    """Role management interface for treasurers"""
+    return render_template('role_management.html', members=treasurer_app.members)
+
+@app.route('/assign_role', methods=['POST'])
+@require_auth
+@require_permission('assign_roles')
+def assign_role():
+    """Assign a role to a member"""
+    member_id = request.form.get('member_id')
+    role = request.form.get('role')
+    
+    if not member_id or not role:
+        flash('Member and role must be specified.', 'error')
+        return redirect(url_for('role_management'))
+    
+    if member_id not in treasurer_app.members:
+        flash('Member not found.', 'error')
+        return redirect(url_for('role_management'))
+    
+    # Check if role is already taken (except for brother role)
+    if role != 'brother':
+        for existing_id, existing_member in treasurer_app.members.items():
+            if existing_member.role == role and existing_id != member_id:
+                flash(f'{role.replace("_", " ").title()} position is already filled by {existing_member.name}.', 'warning')
+                return redirect(url_for('role_management'))
+    
+    # Update member role
+    member = treasurer_app.members[member_id]
+    old_role = member.role if hasattr(member, 'role') and member.role else 'brother'
+    member.role = role
+    
+    # Save changes
+    treasurer_app.save_data(treasurer_app.members_file, treasurer_app.members)
+    
+    flash(f'{member.name} has been assigned as {role.replace("_", " ").title()}.', 'success')
+    return redirect(url_for('role_management'))
+
+@app.route('/change_role', methods=['POST'])
+@require_auth
+@require_permission('assign_roles')
+def change_role():
+    """Change a member's role"""
+    member_id = request.form.get('member_id')
+    new_role = request.form.get('role')
+    
+    if not member_id or not new_role:
+        flash('Member and role must be specified.', 'error')
+        return redirect(url_for('role_management'))
+    
+    if member_id not in treasurer_app.members:
+        flash('Member not found.', 'error')
+        return redirect(url_for('role_management'))
+    
+    # Check if new role is already taken (except for brother role)
+    if new_role != 'brother':
+        for existing_id, existing_member in treasurer_app.members.items():
+            if existing_member.role == new_role and existing_id != member_id:
+                flash(f'{new_role.replace("_", " ").title()} position is already filled by {existing_member.name}.', 'warning')
+                return redirect(url_for('role_management'))
+    
+    # Update member role
+    member = treasurer_app.members[member_id]
+    old_role = member.role if hasattr(member, 'role') and member.role else 'brother'
+    member.role = new_role
+    
+    # Save changes
+    treasurer_app.save_data(treasurer_app.members_file, treasurer_app.members)
+    
+    if new_role == old_role:
+        flash(f'{member.name} role unchanged.', 'info')
+    else:
+        flash(f'{member.name} role changed from {old_role.replace("_", " ").title()} to {new_role.replace("_", " ").title()}.', 'success')
+    
+    return redirect(url_for('role_management'))
+
 @app.route('/ai_assistant', methods=['GET', 'POST'])
 @require_auth
 def ai_assistant():

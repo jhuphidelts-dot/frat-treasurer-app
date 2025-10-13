@@ -208,6 +208,9 @@
                                     <span class="badge bg-warning ms-1">{{ pending_brothers.values() | selectattr('is_verified', 'false') | list | length }}</span>
                                 {% endif %}
                             </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('role_management') }}">
+                                <i class="bi bi-people-fill"></i> Manage Roles
+                            </a></li>
                             {% endif %}
                             <li><a class="dropdown-item" href="{{ url_for('change_password') }}">
                                 <i class="bi bi-key"></i> Change Password
@@ -533,6 +536,11 @@
                         <a href="/dues_summary" class="btn btn-success me-2">
                             <i class="bi bi-graph-up"></i> Dues Summary
                         </a>
+                        {% if has_permission('assign_roles') %}
+                        <a href="{{ url_for('role_management') }}" class="btn btn-warning me-2">
+                            <i class="bi bi-people-fill"></i> Manage Roles
+                        </a>
+                        {% endif %}
                         <!-- Google Sheets export removed -->
                         <a href="/budget_summary" class="btn btn-outline-secondary" target="_blank">
                             <i class="bi bi-file-earmark-bar-graph"></i> Detailed Budget Report
