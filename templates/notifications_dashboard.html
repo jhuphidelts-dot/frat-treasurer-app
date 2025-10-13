@@ -138,19 +138,40 @@
                         <h5 class="mb-0"><i class="bi bi-lightning"></i> Quick Actions</h5>
                     </div>
                     <div class="card-body">
-                        <div class="d-flex flex-wrap gap-2">
+                        <div class="d-flex flex-wrap gap-2 mb-3">
                             <a href="{{ url_for('treasurer_setup') }}" class="btn btn-primary">
                                 <i class="bi bi-gear"></i> Configure Notifications
                             </a>
                             <a href="{{ url_for('test_sms') }}" class="btn btn-info">
-                                <i class="bi bi-phone-vibrate"></i> Test SMS System
+                                <i class="bi bi-phone-vibrate"></i> Test SMS to Treasurer
                             </a>
                             <a href="{{ url_for('test_approval_notification') }}" class="btn btn-success">
                                 <i class="bi bi-bell"></i> Test Approval Notification
                             </a>
-                            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
                                 <i class="bi bi-house"></i> Back to Dashboard
                             </a>
+                        </div>
+                        
+                        <!-- SMS Testing Form -->
+                        <div class="card bg-light mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="bi bi-phone"></i> Test SMS to Custom Number</h6>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST" action="{{ url_for('test_sms_to_number') }}">
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-phone"></i></span>
+                                        <input type="tel" class="form-control" name="test_phone" placeholder="+1234567890 or 234-567-8901" required>
+                                        <button type="submit" class="btn btn-outline-primary">
+                                            <i class="bi bi-send"></i> Send Test SMS
+                                        </button>
+                                    </div>
+                                    <div class="form-text">
+                                        <i class="bi bi-info-circle"></i> Use this to test SMS delivery to any phone number (useful for testing brother registration SMS)
+                                    </div>
+                                </form>
+                            </div>
                         </div>
                         
                         <hr class="my-3">

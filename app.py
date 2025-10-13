@@ -30,51 +30,90 @@ app.secret_key = os.environ.get("SECRET_KEY", "change-me")  # needed for flash()
 # app.register_blueprint(notifications_bp)  # Commented out due to compatibility issues
 app.register_blueprint(export_bp)
 
-# SMS Gateway mappings for email-to-SMS
+# SMS Gateway mappings for email-to-SMS (Updated and optimized)
 SMS_GATEWAYS = {
     'verizon': '@vtext.com',
     'att': '@txt.att.net', 
     'tmobile': '@tmomail.net',
-    'sprint': '@messaging.sprintpcs.com',
+    'sprint': '@messaging.sprintpcs.com',  # Now T-Mobile
     'boost': '@smsmyboostmobile.com',
     'cricket': '@sms.cricketwireless.net',
     'uscellular': '@email.uscc.net',
     'virgin': '@vmobl.com',
-    'metropcs': '@mymetropcs.com'
+    'metropcs': '@mymetropcs.com',
+    # Additional gateways for better coverage
+    'google_fi': '@msg.fi.google.com',
+    'xfinity': '@vtext.com',
+    'straighttalk': '@vtext.com'
 }
 
+# Primary gateways that work most reliably
+PRIMARY_GATEWAYS = ['verizon', 'att', 'tmobile']
+
 def send_email_to_sms(phone, message, config):
-    """Send SMS via email-to-SMS gateway"""
+    """Send SMS via email-to-SMS gateway with improved error handling"""
     if not config.smtp_username or not config.smtp_password:
+        print("SMS Error: SMTP credentials not configured")
         return False
     
-    # Clean phone number
+    # Clean and validate phone number
     clean_phone = ''.join(filter(str.isdigit, phone))
     if len(clean_phone) == 11 and clean_phone.startswith('1'):
         clean_phone = clean_phone[1:]  # Remove leading 1
     elif len(clean_phone) != 10:
+        print(f"SMS Error: Invalid phone number format: {phone}")
         return False
     
+    # Limit message length for SMS compatibility
+    if len(message) > 160:
+        message = message[:157] + "..."
+    
+    # Try primary gateways first (most reliable)
+    gateways_to_try = [(name, SMS_GATEWAYS[name]) for name in PRIMARY_GATEWAYS]
+    
     success_count = 0
-    # Try multiple carriers for better delivery
-    for carrier, gateway in SMS_GATEWAYS.items():
+    last_error = None
+    
+    for carrier, gateway in gateways_to_try:
         try:
             sms_email = clean_phone + gateway
+            print(f"Attempting SMS via {carrier} to {sms_email}")
             
+            # Create email message
             msg = MIMEText(message)
-            msg['Subject'] = ''
+            msg['Subject'] = ''  # Empty subject for SMS
             msg['From'] = config.smtp_username
             msg['To'] = sms_email
             
-            server = smtplib.SMTP('smtp.gmail.com', 587)
+            # Send via SMTP with timeout settings
+            server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)  # 10 second timeout
+            server.set_debuglevel(0)  # Disable debug for production
             server.starttls()
             server.login(config.smtp_username, config.smtp_password)
             server.send_message(msg)
             server.quit()
-            success_count += 1
             
-        except Exception:
+            success_count += 1
+            print(f"SMS sent successfully via {carrier}")
+            
+            # Don't try other gateways if one succeeds
+            break
+            
+        except smtplib.SMTPAuthenticationError as e:
+            print(f"SMS Error ({carrier}): Authentication failed - check Gmail app password")
+            last_error = f"Authentication failed: {str(e)}"
+            break  # No point trying other gateways if auth fails
+        except smtplib.SMTPException as e:
+            print(f"SMS Error ({carrier}): SMTP error - {str(e)}")
+            last_error = f"SMTP error: {str(e)}"
             continue  # Try next gateway
+        except Exception as e:
+            print(f"SMS Error ({carrier}): {str(e)}")
+            last_error = f"General error: {str(e)}"
+            continue  # Try next gateway
+    
+    if success_count == 0:
+        print(f"SMS Failed: All gateways failed. Last error: {last_error}")
     
     return success_count > 0
 
@@ -93,7 +132,7 @@ def notify_treasurer(message, config, notification_type="Alert"):
             msg['From'] = config.smtp_username
             msg['To'] = config.email
             
-            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
             server.starttls()
             server.login(config.smtp_username, config.smtp_password)
             server.send_message(msg)
@@ -124,6 +163,28 @@ def notify_spending_plan_request(submitter_name, category, amount, description, 
     """Notify treasurer about spending plan request"""
     message = f"{submitter_name} has submitted a spending plan request:\n\nCategory: {category}\nAmount: ${amount:.2f}\nDescription: {description}\n\nPlease review and approve in the app."
     return notify_treasurer(message, config, "Spending Plan Request")
+
+def send_brother_credentials_sms(full_name, phone, username, password, config):
+    """Send login credentials to approved brother via SMS"""
+    if not config.smtp_username or not config.smtp_password:
+        print("Brother SMS Error: SMTP credentials not configured")
+        return False
+    
+    # Create concise SMS message (SMS has 160 char limit)
+    first_name = full_name.split()[0] if full_name else "Brother"
+    message = f"Fraternity Account Approved! Hi {first_name}, Login: {username} Pass: {password} Change password after first login."
+    
+    print(f"\n📱 Sending brother credentials to {first_name} at {phone}")
+    
+    # Send SMS via email-to-SMS gateway
+    success = send_email_to_sms(phone, message, config)
+    
+    if success:
+        print(f"✅ Brother credentials SMS sent successfully to {phone}")
+    else:
+        print(f"❌ Brother credentials SMS failed to {phone}")
+    
+    return success
 
 # Role-based access control for member roles
 MEMBER_ROLE_PERMISSIONS = {
@@ -500,6 +561,22 @@ class TreasurerApp:
                             archived=semester_data.get('archived', False)
                         )
                     return loaded_semesters
+                # Convert loaded pending brothers back to PendingBrother objects if needed
+                elif 'pending_brothers.json' in file_path and data:
+                    loaded_pending = {}
+                    for pending_id, pending_data in data.items():
+                        loaded_pending[pending_id] = PendingBrother(
+                            id=pending_data['id'],
+                            full_name=pending_data['full_name'],
+                            phone=pending_data['phone'],
+                            email=pending_data['email'],
+                            registration_date=pending_data['registration_date'],
+                            verification_token=pending_data['verification_token'],
+                            is_verified=pending_data.get('is_verified', False),
+                            member_id=pending_data.get('member_id'),
+                            user_id=pending_data.get('user_id')
+                        )
+                    return loaded_pending
                 return data
         return default_data
     
@@ -1029,7 +1106,7 @@ class TreasurerApp:
                 msg['To'] = sms_email
                 msg['Subject'] = ""  # Empty subject for SMS
                 
-                server = smtplib.SMTP('smtp.gmail.com', 587)
+                server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
                 server.starttls()
                 server.login(smtp_username, smtp_password)
                 server.send_message(msg)
@@ -1083,7 +1160,7 @@ class TreasurerApp:
             msg['Subject'] = subject
             
             print(f"DEBUG: Connecting to Gmail SMTP server...")
-            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
             server.starttls()
             print(f"DEBUG: Logging in with {smtp_username}...")
             server.login(smtp_username, smtp_password)
@@ -1123,10 +1200,12 @@ class TreasurerApp:
                 print(f"DEBUG: Sending reminder to {member.name} ({member.contact_type}: {member.contact})")
                 message = f"Hi {member.name}! Your fraternity dues balance is ${balance:.2f}. Please pay via Zelle or Venmo. Thanks!"
                 
-                # Try enhanced email-to-SMS for phone contacts
+                # Send reminder based on contact type
                 if member.contact_type == 'phone':
+                    print(f"DEBUG: Sending SMS to {member.contact} via email-to-SMS gateway")
                     result = send_email_to_sms(member.contact, message, self.treasurer_config)
                 else:
+                    print(f"DEBUG: Sending email to {member.contact}")
                     result = self.send_email(member.contact, "Fraternity Dues Reminder", message)
                 
                 if result:
@@ -1397,9 +1476,14 @@ class TreasurerApp:
         
         # Create user account for the brother
         username = pending_brother.email.lower()
-        temp_password = f"temp{pending_brother.id[:8]}"  # Temporary password
         
-        if self.create_user(username, temp_password, 'brother'):
+        # Generate secure random password
+        import secrets
+        import string
+        alphabet = string.ascii_letters + string.digits
+        secure_password = ''.join(secrets.choice(alphabet) for _ in range(12))
+        
+        if self.create_user(username, secure_password, 'brother'):
             # Link member to user account
             member.user_id = username
             
@@ -1412,7 +1496,28 @@ class TreasurerApp:
             self.save_data(self.members_file, self.members)
             self.save_data(self.pending_brothers_file, self.pending_brothers)
             
-            return True, f"Brother verified! Username: {username}, Temp password: {temp_password}"
+            # Send login credentials via SMS
+            sms_sent = False
+            if self.treasurer_config.smtp_username and self.treasurer_config.smtp_password:
+                try:
+                    sms_sent = send_brother_credentials_sms(
+                        pending_brother.full_name, 
+                        pending_brother.phone, 
+                        username, 
+                        secure_password, 
+                        self.treasurer_config
+                    )
+                except Exception as e:
+                    print(f"SMS sending failed: {e}")
+            
+            if sms_sent:
+                # Remove from pending brothers after successful verification and SMS
+                del self.pending_brothers[pending_id]
+                self.save_data(self.pending_brothers_file, self.pending_brothers)
+                
+                return True, f"✅ Brother {pending_brother.full_name} verified successfully!\n📱 Login credentials sent via SMS to {pending_brother.phone}\n🔐 Username: {username}"
+            else:
+                return True, f"✅ Brother {pending_brother.full_name} verified successfully!\n⚠️ SMS failed - Login credentials:\nUsername: {username}\nPassword: {secure_password}\n📞 Please manually share these credentials with the brother."
         
         return False, "Failed to create user account"
     
@@ -1690,8 +1795,39 @@ def record_payment():
 @require_auth
 @require_permission('send_reminders')
 def send_reminders():
-    treasurer_app.check_and_send_reminders()
-    flash('Reminders sent to all eligible members!')
+    try:
+        print("\n🚀 Starting bulk reminder sending...")
+        
+        # Add timeout protection
+        import signal
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Reminder sending timed out")
+        
+        # Set 60 second timeout
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(60)
+        
+        try:
+            reminders_sent = treasurer_app.check_and_send_reminders()
+            signal.alarm(0)  # Cancel timeout
+            
+            if reminders_sent > 0:
+                flash(f'✅ {reminders_sent} payment reminders sent successfully!', 'success')
+            else:
+                flash('ℹ️ No reminders needed - all members are paid up!', 'info')
+        except TimeoutError:
+            signal.alarm(0)  # Cancel timeout
+            flash('⏰ Reminder sending timed out. Try selective reminders for better control.', 'warning')
+        except Exception as e:
+            signal.alarm(0)  # Cancel timeout
+            print(f"Reminder error: {e}")
+            flash(f'❌ Error sending reminders: {str(e)}', 'error')
+            
+    except Exception as e:
+        print(f"Outer reminder error: {e}")
+        flash('❌ Failed to send reminders. Check your email/SMS configuration.', 'error')
+    
     return redirect(url_for('dashboard'))
 
 @app.route('/selective_reminders', methods=['GET', 'POST'])
@@ -1717,11 +1853,42 @@ def selective_reminders():
     selected_members = request.form.getlist('selected_members')
     
     if not selected_members:
-        flash('No members selected for reminders!')
+        flash('No members selected for reminders!', 'warning')
         return redirect(url_for('selective_reminders'))
     
-    treasurer_app.check_and_send_reminders(selected_members)
-    flash(f'Reminders sent to {len(selected_members)} selected member(s)!')
+    try:
+        print(f"\n📱 Sending selective reminders to {len(selected_members)} members...")
+        
+        # Add timeout protection for selective reminders too
+        import signal
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Selective reminder sending timed out")
+        
+        # Set 30 second timeout (shorter for selective)
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(30)
+        
+        try:
+            reminders_sent = treasurer_app.check_and_send_reminders(selected_members)
+            signal.alarm(0)  # Cancel timeout
+            
+            if reminders_sent > 0:
+                flash(f'✅ Reminders sent to {reminders_sent} selected member(s)!', 'success')
+            else:
+                flash('ℹ️ No reminders sent - check member balances.', 'info')
+        except TimeoutError:
+            signal.alarm(0)  # Cancel timeout
+            flash('⏰ Selective reminder sending timed out. Try fewer members at once.', 'warning')
+        except Exception as e:
+            signal.alarm(0)  # Cancel timeout
+            print(f"Selective reminder error: {e}")
+            flash(f'❌ Error sending selective reminders: {str(e)}', 'error')
+            
+    except Exception as e:
+        print(f"Outer selective reminder error: {e}")
+        flash('❌ Failed to send selective reminders. Check configuration.', 'error')
+    
     return redirect(url_for('dashboard'))
 
 @app.route('/budget_summary')
@@ -2176,18 +2343,59 @@ def exit_preview():
 @require_auth
 @require_permission('send_reminders')
 def test_sms():
-    """Test SMS functionality"""
+    """Test SMS functionality with comprehensive diagnostics"""
     config = treasurer_app.treasurer_config
     if not config.phone:
-        flash('Please configure your phone number in Treasurer Setup first.')
+        flash('Please configure your phone number in Treasurer Setup first.', 'error')
         return redirect(url_for('treasurer_setup'))
     
-    test_message = "Test SMS from Fraternity Treasurer App - working correctly!"
+    if not config.smtp_username or not config.smtp_password:
+        flash('Please configure your email credentials in Treasurer Setup first.', 'error')
+        return redirect(url_for('treasurer_setup'))
+    
+    test_message = "Test SMS from Fraternity Treasurer App - SMS working correctly! 📱✅"
+    
+    print(f"\n🧪 SMS TEST STARTING")
+    print(f"📱 Phone: {config.phone}")
+    print(f"📧 SMTP User: {config.smtp_username}")
+    print(f"💬 Message: {test_message}")
     
     if send_email_to_sms(config.phone, test_message, config):
-        flash(f'Test SMS sent successfully to {config.phone}!')
+        flash(f'✅ Test SMS sent successfully to {config.phone}!', 'success')
+        flash('📱 Check your phone for the message (may take 1-2 minutes).', 'info')
     else:
-        flash('Failed to send test SMS. Check your email configuration.')
+        flash('❌ Failed to send test SMS. Check the console logs for details.', 'error')
+        flash('💡 Common issues: Gmail app password expired, phone number format, or carrier blocking.', 'warning')
+    
+    return redirect(url_for('notifications_dashboard'))
+
+@app.route('/test_sms_to_number', methods=['POST'])
+@require_auth
+@require_permission('send_reminders')
+def test_sms_to_number():
+    """Test SMS to a specific phone number"""
+    config = treasurer_app.treasurer_config
+    test_phone = request.form.get('test_phone', '').strip()
+    
+    if not test_phone:
+        flash('Please enter a phone number to test.', 'error')
+        return redirect(url_for('notifications_dashboard'))
+    
+    if not config.smtp_username or not config.smtp_password:
+        flash('Please configure your email credentials in Treasurer Setup first.', 'error')
+        return redirect(url_for('treasurer_setup'))
+    
+    test_message = f"Test SMS from Fraternity Treasurer App to {test_phone} 📱✅"
+    
+    print(f"\n🧪 SMS TEST TO CUSTOM NUMBER")
+    print(f"📱 Target Phone: {test_phone}")
+    print(f"📧 SMTP User: {config.smtp_username}")
+    
+    if send_email_to_sms(test_phone, test_message, config):
+        flash(f'✅ Test SMS sent successfully to {test_phone}!', 'success')
+        flash('📱 Check the target phone for the message (may take 1-2 minutes).', 'info')
+    else:
+        flash(f'❌ Failed to send test SMS to {test_phone}. Check console logs.', 'error')
     
     return redirect(url_for('notifications_dashboard'))
 
@@ -2295,8 +2503,17 @@ def brother_registration():
     # Register the brother
     try:
         pending_id = treasurer_app.register_brother(full_name, phone, email)
-        flash('Registration submitted successfully! The treasurer will review and verify your account.', 'success')
-        return render_template('brother_registration.html')
+        
+        # Success message with clear next steps
+        flash('🎉 Registration submitted successfully!', 'success')
+        flash('✅ Your information has been sent to the treasurer for verification.', 'info')
+        flash('📱 Once approved, your login credentials will be sent to your phone via SMS.', 'info')
+        flash('⏰ Please allow 24-48 hours for verification.', 'info')
+        
+        return render_template('brother_registration_success.html', 
+                             full_name=full_name, 
+                             phone=phone, 
+                             email=email)
     except Exception as e:
         flash(f'Registration failed: {str(e)}', 'error')
         return render_template('brother_registration.html')
