@@ -2740,44 +2740,11 @@ def get_ai_response(message):
 # This app is designed to run exclusively on cloud platforms (Render.com)
 # Local development has been disabled - use the live deployment only
 if __name__ == '__main__':
-    # Debug environment detection
-    print(f"Environment check:")
-    print(f"  RENDER_SERVICE_ID: {os.environ.get('RENDER_SERVICE_ID', 'NOT SET')}")
-    print(f"  PORT: {os.environ.get('PORT', 'NOT SET')}")
-    print(f"  HOSTNAME: {os.environ.get('HOSTNAME', 'NOT SET')}")
-    print(f"  PWD: {os.environ.get('PWD', 'NOT SET')}")
+    # Standard Flask startup - works both locally and on Render
+    port = int(os.environ.get('PORT', 8080))
+    debug = os.environ.get('DEBUG', 'False').lower() == 'true'
     
-    # Check if running on Render or other cloud platform
-    # Render sets RENDER_SERVICE_ID environment variable
-    is_cloud = (
-        os.environ.get('RENDER_SERVICE_ID') or  # Render
-        os.environ.get('DYNO') or              # Heroku
-        os.environ.get('GOOGLE_CLOUD_PROJECT') or  # Google Cloud
-        os.environ.get('AWS_LAMBDA_FUNCTION_NAME') or  # AWS Lambda
-        os.environ.get('WEBSITE_SITE_NAME') or      # Azure
-        'render.com' in os.environ.get('HOSTNAME', '') or
-        os.path.exists('/.dockerenv') or  # Docker container
-        os.environ.get('PORT')  # Most cloud platforms set PORT
-    )
+    print(f"🚀 Starting Flask app on port {port}")
     
-    if is_cloud:
-        # Running on cloud platform - start the app normally
-        port = int(os.environ.get('PORT', 10000))
-        debug = os.environ.get('DEBUG', 'False').lower() == 'true'
-        print(f"🚀 Starting Flask app on port {port} (debug={debug})")
-        app.run(host='0.0.0.0', port=port, debug=debug)
-    else:
-        # Running locally - show deployment message and exit
-        print("\n❌ LOCAL HOSTING DISABLED")
-        print("\n🚀 This app runs exclusively on Render.com")
-        print("\n📋 To access your app:")
-        print("   1. Visit your Render dashboard: https://render.com/dashboard")
-        print("   2. Find your frat-treasurer-app service")
-        print("   3. Use the provided URL to access your live app")
-        print("\n💡 All changes are automatically deployed when pushed to GitHub")
-        print("\n⚠️  If you need to make changes:")
-        print("   1. Edit code locally")
-        print("   2. Commit changes: git add . && git commit -m 'description'")
-        print("   3. Push to deploy: git push origin main")
-        print("\n🔒 Local hosting permanently disabled for security")
-        exit(1)
+    # Bind to 0.0.0.0 for cloud deployment compatibility
+    app.run(host='0.0.0.0', port=port, debug=debug)
