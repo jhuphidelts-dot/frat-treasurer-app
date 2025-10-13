@@ -1524,7 +1524,7 @@ def login():
         if treasurer_app.users[username]['role'] == 'brother':
             return redirect(url_for('brother_dashboard'))
         else:
-            return redirect(url_for('index'))
+            return redirect(url_for('dashboard'))
     else:
         flash('Invalid username or password')
         return redirect(url_for('login'))
@@ -1532,7 +1532,14 @@ def login():
 @app.route('/logout')
 def logout():
     session.clear()
-    flash('You have been logged out')
+    flash('You have been logged out successfully')
+    return redirect(url_for('login'))
+
+@app.route('/force-logout')
+def force_logout():
+    """Force logout - clears all sessions and redirects to login"""
+    session.clear()
+    flash('All sessions cleared - Please log in again')
     return redirect(url_for('login'))
 
 @app.route('/change_password', methods=['GET', 'POST'])
@@ -1551,7 +1558,7 @@ def change_password():
     
     if treasurer_app.change_password(session['user'], old_password, new_password):
         flash('Password changed successfully!')
-        return redirect(url_for('index'))
+        return redirect(url_for('dashboard'))
     else:
         flash('Current password is incorrect')
         return redirect(url_for('change_password'))
@@ -1563,8 +1570,21 @@ def monthly_income():
     return render_template('monthly_income.html', monthly_data=monthly_data)
 
 @app.route('/')
+def landing_page():
+    # Check if user is already logged in
+    if 'user' in session:
+        # Redirect to appropriate dashboard based on role
+        if session.get('role') == 'brother':
+            return redirect(url_for('brother_dashboard'))
+        else:
+            return redirect(url_for('dashboard'))
+    
+    # Show login page for unauthenticated users
+    return redirect(url_for('login'))
+
+@app.route('/dashboard')
 @require_auth
-def index():
+def dashboard():
     dues_summary = treasurer_app.get_dues_collection_summary()
     return render_template('index.html', 
                          members=treasurer_app.members,
@@ -1594,7 +1614,7 @@ def add_member():
     
     member_id = treasurer_app.add_member(name, contact, dues_amount, payment_plan)
     flash(f'Member {name} added successfully!')
-    return redirect(url_for('index'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/add_transaction', methods=['POST'])
 @require_auth
@@ -1607,7 +1627,7 @@ def add_transaction():
     
     treasurer_app.add_transaction(category, description, amount, transaction_type)
     flash('Transaction added successfully!')
-    return redirect(url_for('index'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/edit_transaction/<transaction_id>', methods=['GET', 'POST'])
 @require_auth
@@ -1664,7 +1684,7 @@ def record_payment():
     else:
         flash('Error recording payment!')
     
-    return redirect(url_for('index'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/send_reminders')
 @require_auth
@@ -1672,7 +1692,7 @@ def record_payment():
 def send_reminders():
     treasurer_app.check_and_send_reminders()
     flash('Reminders sent to all eligible members!')
-    return redirect(url_for('index'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/selective_reminders', methods=['GET', 'POST'])
 @require_auth
@@ -1702,7 +1722,7 @@ def selective_reminders():
     
     treasurer_app.check_and_send_reminders(selected_members)
     flash(f'Reminders sent to {len(selected_members)} selected member(s)!')
-    return redirect(url_for('index'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/budget_summary')
 @require_auth
@@ -1822,7 +1842,7 @@ def confirm_bulk_import():
             added_count += 1
     
     flash(f'Successfully added {added_count} members!')
-    return redirect(url_for('index'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/edit_member/<member_id>', methods=['GET', 'POST'])
 @require_auth
@@ -1831,7 +1851,7 @@ def edit_member(member_id):
     if request.method == 'GET':
         if member_id not in treasurer_app.members:
             flash('Member not found!')
-            return redirect(url_for('index'))
+            return redirect(url_for('dashboard'))
         
         member = treasurer_app.members[member_id]
         payment_schedule = treasurer_app.get_member_payment_schedule(member_id)
@@ -1867,14 +1887,14 @@ def remove_member(member_id):
     else:
         flash('Member not found!')
     
-    return redirect(url_for('index'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/member_details/<member_id>')
 @require_auth
 def member_details(member_id):
     if member_id not in treasurer_app.members:
         flash('Member not found!')
-        return redirect(url_for('index'))
+        return redirect(url_for('dashboard'))
     
     member = treasurer_app.members[member_id]
     payment_schedule = treasurer_app.get_member_payment_schedule(member_id)
@@ -1941,7 +1961,7 @@ def edit_budget_category(category):
 def custom_payment_schedule(member_id):
     if member_id not in treasurer_app.members:
         flash('Member not found!')
-        return redirect(url_for('index'))
+        return redirect(url_for('dashboard'))
     
     member = treasurer_app.members[member_id]
     
