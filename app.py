@@ -22,7 +22,7 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 
 # Import Flask blueprints
-from notifications import notifications_bp
+# from notifications import notifications_bp  # Commented out due to compatibility issues
 from export_system import export_bp
 
 
@@ -35,7 +35,7 @@ SHEET_ID = "1im714pqV9b9jA6fQDH_GmIrpBwKm7IWViu27whK6aGo"
 SERVICE_FILE = os.path.join(os.path.dirname(__file__), "service_account.json")
 
 # Register blueprints
-app.register_blueprint(notifications_bp)
+# app.register_blueprint(notifications_bp)  # Commented out due to compatibility issues
 app.register_blueprint(export_bp)
 
 def export_to_google_sheet():
@@ -1489,7 +1489,7 @@ def edit_member(member_id):
     else:
         flash('Error updating member!')
     
-    return redirect(url_for('index'))
+    return redirect(url_for('member_details', member_id=member_id))
 
 @app.route('/remove_member/<member_id>', methods=['POST'])
 @require_auth
@@ -1812,6 +1812,77 @@ def export_improved_sheets():
         flash(f'Export failed: {e}')
     
     return redirect(url_for('index'))
+
+@app.route('/preview_role/<role_name>')
+@require_auth
+def preview_role(role_name):
+    """Preview dashboard as different role (treasurer only)"""
+    # Check if user is treasurer/admin
+    if session.get('user') != 'admin':  # Only admin can preview roles
+        flash('Only treasurers can preview other roles.')
+        return redirect(url_for('index'))
+    
+    # Valid roles for preview
+    valid_roles = ['president', 'vice_president', 'social_chair', 'phi_ed_chair', 'recruitment_chair', 'brotherhood_chair', 'brother']
+    if role_name not in valid_roles:
+        flash('Invalid role for preview.')
+        return redirect(url_for('index'))
+    
+    # Store current role in session for restoration
+    session['preview_mode'] = True
+    session['preview_role'] = role_name
+    session['original_role'] = 'admin'
+    
+    flash(f'Now previewing dashboard as: {role_name.replace("_", " ").title()}. Click "Exit Preview" to return to treasurer view.')
+    return redirect(url_for('index'))
+
+@app.route('/exit_preview')
+@require_auth
+def exit_preview():
+    """Exit role preview mode"""
+    if 'preview_mode' in session:
+        del session['preview_mode']
+        del session['preview_role']
+        del session['original_role']
+        flash('Exited preview mode. Back to treasurer view.')
+    return redirect(url_for('index'))
+
+@app.route('/notifications')
+@require_auth
+def notifications_dashboard():
+    """Simple notifications dashboard"""
+    # Get recent reminders sent
+    recent_reminders = []
+    
+    # Get members with outstanding balances for potential reminders
+    members_need_reminder = []
+    for member_id, member in treasurer_app.members.items():
+        balance = treasurer_app.get_member_balance(member_id)
+        if balance > 0:
+            members_need_reminder.append({
+                'id': member_id,
+                'name': member.name,
+                'balance': balance,
+                'contact': member.contact,
+                'contact_type': member.contact_type
+            })
+    
+    # Check notification configuration status
+    config = treasurer_app.treasurer_config
+    email_configured = bool(config.smtp_username and config.smtp_password)
+    sms_configured = bool(config.twilio_sid and config.twilio_token)
+    
+    notification_status = {
+        'email_configured': email_configured,
+        'sms_configured': sms_configured,
+        'email_username': config.smtp_username,
+        'twilio_phone': config.twilio_phone
+    }
+    
+    return render_template('notifications_dashboard.html',
+                         members_need_reminder=members_need_reminder,
+                         recent_reminders=recent_reminders,
+                         notification_status=notification_status)
 
 @app.route('/ai_assistant', methods=['GET', 'POST'])
 @require_auth
