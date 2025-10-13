@@ -235,10 +235,11 @@ MEMBER_ROLE_PERMISSIONS = {
         'assign_roles': False,
     },
     'vice_president': {
-        # VP access - similar to president
-        'view_all_data': True,
+        # VP access - can only view own data and general info, NOT individual dues
+        'view_all_data': False,
         'view_own_data': True,
-        'view_dues_info': True,
+        'view_dues_info': False,  # No individual dues access
+        'view_general_budget': True,  # Can see general budget info
         'edit_all_data': False,
         'manage_users': False,
         'send_reminders': False,
@@ -251,10 +252,10 @@ MEMBER_ROLE_PERMISSIONS = {
         'assign_roles': False,
     },
     'social_chair': {
-        # Social chair - view social budget and expenses
+        # Social chair - view social budget and expenses only
         'view_all_data': False,
         'view_own_data': True,
-        'view_dues_info': True,
+        'view_dues_info': False,  # No individual dues access
         'view_social_budget': True,
         'edit_all_data': False,
         'manage_users': False,
@@ -271,7 +272,7 @@ MEMBER_ROLE_PERMISSIONS = {
         # Phi Ed chair access
         'view_all_data': False,
         'view_own_data': True,
-        'view_dues_info': True,
+        'view_dues_info': False,  # No individual dues access
         'view_phi_ed_budget': True,
         'edit_all_data': False,
         'manage_users': False,
@@ -288,7 +289,7 @@ MEMBER_ROLE_PERMISSIONS = {
         # Brotherhood chair access
         'view_all_data': False,
         'view_own_data': True,
-        'view_dues_info': True,
+        'view_dues_info': False,  # No individual dues access
         'view_brotherhood_budget': True,
         'edit_all_data': False,
         'manage_users': False,
@@ -305,7 +306,7 @@ MEMBER_ROLE_PERMISSIONS = {
         # Recruitment chair access
         'view_all_data': False,
         'view_own_data': True,
-        'view_dues_info': True,
+        'view_dues_info': False,  # No individual dues access
         'view_recruitment_budget': True,
         'edit_all_data': False,
         'manage_users': False,
@@ -2740,11 +2741,21 @@ def get_ai_response(message):
 # This app is designed to run exclusively on cloud platforms (Render.com)
 # Local development has been disabled - use the live deployment only
 if __name__ == '__main__':
-    # Standard Flask startup - works both locally and on Render
-    port = int(os.environ.get('PORT', 8080))
-    debug = os.environ.get('DEBUG', 'False').lower() == 'true'
+    # Check if we're on Render (cloud) by checking for PORT environment variable
+    port = os.environ.get('PORT')
     
-    print(f"🚀 Starting Flask app on port {port}")
-    
-    # Bind to 0.0.0.0 for cloud deployment compatibility
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    if port:
+        # We're on Render - start the app
+        port = int(port)
+        debug = os.environ.get('DEBUG', 'False').lower() == 'true'
+        print(f"🚀 Starting Flask app on Render.com (port {port})")
+        app.run(host='0.0.0.0', port=port, debug=debug)
+    else:
+        # Local environment - prevent hosting for security
+        print("\n❌ LOCAL HOSTING DISABLED")
+        print("\n🚀 This app runs exclusively on Render.com")
+        print("\n📋 To access your app:")
+        print("   Visit your Render dashboard and use the provided URL")
+        print("\n🔒 Local hosting permanently disabled for security")
+        import sys
+        sys.exit(1)
