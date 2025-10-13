@@ -125,6 +125,197 @@ def notify_spending_plan_request(submitter_name, category, amount, description, 
     message = f"{submitter_name} has submitted a spending plan request:\n\nCategory: {category}\nAmount: ${amount:.2f}\nDescription: {description}\n\nPlease review and approve in the app."
     return notify_treasurer(message, config, "Spending Plan Request")
 
+# Role-based access control for member roles
+MEMBER_ROLE_PERMISSIONS = {
+    'admin': {
+        # Full admin permissions (treasurer)
+        'view_all_data': True,
+        'edit_all_data': True,
+        'manage_users': True,
+        'send_reminders': True,
+        'add_transactions': True,
+        'edit_transactions': True,
+        'add_members': True,
+        'edit_members': True,
+        'record_payments': True,
+        'manage_budgets': True,
+        'assign_roles': True,
+    },
+    'brother': {
+        # Basic brother access
+        'view_all_data': False,
+        'view_own_data': True,
+        'view_dues_info': True,
+        'edit_all_data': False,
+        'manage_users': False,
+        'send_reminders': False,
+        'add_transactions': False,
+        'edit_transactions': False,
+        'add_members': False,
+        'edit_members': False,
+        'record_payments': False,
+        'manage_budgets': False,
+        'assign_roles': False,
+    },
+    'president': {
+        # President access - read all financial data
+        'view_all_data': True,
+        'view_own_data': True,
+        'view_dues_info': True,
+        'edit_all_data': False,
+        'manage_users': False,
+        'send_reminders': False,
+        'add_transactions': False,
+        'edit_transactions': False,
+        'add_members': False,
+        'edit_members': False,
+        'record_payments': False,
+        'manage_budgets': False,
+        'assign_roles': False,
+    },
+    'vice_president': {
+        # VP access - similar to president
+        'view_all_data': True,
+        'view_own_data': True,
+        'view_dues_info': True,
+        'edit_all_data': False,
+        'manage_users': False,
+        'send_reminders': False,
+        'add_transactions': False,
+        'edit_transactions': False,
+        'add_members': False,
+        'edit_members': False,
+        'record_payments': False,
+        'manage_budgets': False,
+        'assign_roles': False,
+    },
+    'social_chair': {
+        # Social chair - view social budget and expenses
+        'view_all_data': False,
+        'view_own_data': True,
+        'view_dues_info': True,
+        'view_social_budget': True,
+        'edit_all_data': False,
+        'manage_users': False,
+        'send_reminders': False,
+        'add_transactions': False,
+        'edit_transactions': False,
+        'add_members': False,
+        'edit_members': False,
+        'record_payments': False,
+        'manage_budgets': False,
+        'assign_roles': False,
+    },
+    'phi_ed_chair': {
+        # Phi Ed chair access
+        'view_all_data': False,
+        'view_own_data': True,
+        'view_dues_info': True,
+        'view_phi_ed_budget': True,
+        'edit_all_data': False,
+        'manage_users': False,
+        'send_reminders': False,
+        'add_transactions': False,
+        'edit_transactions': False,
+        'add_members': False,
+        'edit_members': False,
+        'record_payments': False,
+        'manage_budgets': False,
+        'assign_roles': False,
+    },
+    'brotherhood_chair': {
+        # Brotherhood chair access
+        'view_all_data': False,
+        'view_own_data': True,
+        'view_dues_info': True,
+        'view_brotherhood_budget': True,
+        'edit_all_data': False,
+        'manage_users': False,
+        'send_reminders': False,
+        'add_transactions': False,
+        'edit_transactions': False,
+        'add_members': False,
+        'edit_members': False,
+        'record_payments': False,
+        'manage_budgets': False,
+        'assign_roles': False,
+    },
+    'recruitment_chair': {
+        # Recruitment chair access
+        'view_all_data': False,
+        'view_own_data': True,
+        'view_dues_info': True,
+        'view_recruitment_budget': True,
+        'edit_all_data': False,
+        'manage_users': False,
+        'send_reminders': False,
+        'add_transactions': False,
+        'edit_transactions': False,
+        'add_members': False,
+        'edit_members': False,
+        'record_payments': False,
+        'manage_budgets': False,
+        'assign_roles': False,
+    }
+}
+
+# Legacy role permissions for backwards compatibility
+ROLE_PERMISSIONS = {
+    'admin': MEMBER_ROLE_PERMISSIONS['admin'],
+    'brother': MEMBER_ROLE_PERMISSIONS['brother'],
+    'president': MEMBER_ROLE_PERMISSIONS['president']
+}
+
+def get_current_user_role():
+    """Get current user's role based on session and member data"""
+    if session.get('preview_mode'):
+        return session.get('preview_role', 'admin')
+    
+    # Check if user is admin/treasurer
+    if session.get('user') == 'admin' or session.get('role') == 'admin':
+        return 'admin'
+    
+    # For brother accounts, get role from linked member
+    user_id = session.get('user')
+    if user_id:
+        member = treasurer_app.get_member_by_user_id(user_id)
+        if member and hasattr(member, 'role'):
+            return member.role
+    
+    # Fallback to session role or default
+    return session.get('role', 'brother')
+
+def has_permission(permission_name):
+    """Check if current user has a specific permission"""
+    role = get_current_user_role()
+    
+    # Check member role permissions first
+    if role in MEMBER_ROLE_PERMISSIONS:
+        return MEMBER_ROLE_PERMISSIONS[role].get(permission_name, False)
+    
+    # Fallback to legacy role permissions
+    return ROLE_PERMISSIONS.get(role, {}).get(permission_name, False)
+
+def get_user_member():
+    """Get the member object for the current user"""
+    user_id = session.get('user')
+    if user_id:
+        return treasurer_app.get_member_by_user_id(user_id)
+    return None
+
+def require_permission(permission_name):
+    """Decorator to require specific permission for route access"""
+    def decorator(f):
+        from functools import wraps
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not has_permission(permission_name):
+                flash(f'You do not have permission to {permission_name.replace("_", " ")}. This action is restricted to treasurers only.', 'error')
+                return redirect(url_for('index'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
 # Configuration
 BUDGET_CATEGORIES = [
     'Executive(GHQ, IFC, Flights)', 'Brotherhood', 'Social', 
@@ -142,6 +333,8 @@ class Member:
     payments_made: List[dict] = None
     contact_type: str = 'phone'  # 'phone' or 'email'
     semester_id: str = 'current'  # Links to specific semester
+    role: str = 'brother'  # 'brother', 'president', 'vice_president', 'social_chair', 'phi_ed_chair', 'recruitment_chair', 'brotherhood_chair'
+    user_id: Optional[str] = None  # Link to user account if they have one
     
     def __post_init__(self):
         if self.payments_made is None:
@@ -173,6 +366,18 @@ class Semester:
     archived: bool = False
 
 @dataclass
+class PendingBrother:
+    id: str
+    full_name: str
+    phone: str
+    email: str
+    registration_date: str
+    verification_token: str
+    is_verified: bool = False
+    member_id: Optional[str] = None  # Links to Member once verified
+    user_id: Optional[str] = None  # Links to User account once approved
+
+@dataclass
 class TreasurerConfig:
     name: str = ""
     email: str = ""
@@ -189,6 +394,7 @@ class TreasurerApp:
         self.users_file = os.path.join(self.data_dir, 'users.json')
         self.semesters_file = os.path.join(self.data_dir, 'semesters.json')
         self.treasurer_config_file = os.path.join(self.data_dir, 'treasurer_config.json')
+        self.pending_brothers_file = os.path.join(self.data_dir, 'pending_brothers.json')
         
         # Create data directory if it doesn't exist
         os.makedirs(self.data_dir, exist_ok=True)
@@ -200,6 +406,7 @@ class TreasurerApp:
         self.users = self.load_data(self.users_file, {})
         self.semesters = self.load_data(self.semesters_file, {})
         self.treasurer_config = self.load_treasurer_config()
+        self.pending_brothers = self.load_data(self.pending_brothers_file, {})
         
         # Create default admin user if no users exist
         if not self.users:
@@ -450,6 +657,10 @@ class TreasurerApp:
             serialized_data = {}
             for semester_id, semester in data.items():
                 serialized_data[semester_id] = asdict(semester)
+        elif 'pending_brothers.json' in file_path:
+            serialized_data = {}
+            for pending_id, pending_brother in data.items():
+                serialized_data[pending_id] = asdict(pending_brother)
         else:
             serialized_data = data
         
@@ -499,7 +710,7 @@ class TreasurerApp:
         self.sync_to_google_sheets()
         return member_id
     
-    def update_member(self, member_id, name, contact, dues_amount, payment_plan, custom_schedule=None):
+    def update_member(self, member_id, name, contact, dues_amount, payment_plan, custom_schedule=None, role=None):
         """Update existing member information"""
         if member_id in self.members:
             member = self.members[member_id]
@@ -509,6 +720,12 @@ class TreasurerApp:
             member.contact_type = 'email' if '@' in contact and '.' in contact else 'phone'
             member.dues_amount = dues_amount
             member.payment_plan = payment_plan
+            
+            # Update role if provided
+            if role is not None:
+                member.role = role
+            elif not hasattr(member, 'role'):
+                member.role = 'brother'  # Default role for existing members
             
             # If custom schedule provided, use it; otherwise generate based on plan
             if custom_schedule is not None:
@@ -1126,6 +1343,72 @@ class TreasurerApp:
         self.save_data(self.users_file, self.users)
         return True
     
+    def register_brother(self, full_name, phone, email):
+        """Register a new brother account for verification"""
+        import secrets
+        
+        pending_id = str(uuid.uuid4())
+        verification_token = secrets.token_urlsafe(32)
+        
+        pending_brother = PendingBrother(
+            id=pending_id,
+            full_name=full_name,
+            phone=phone,
+            email=email,
+            registration_date=datetime.now().isoformat(),
+            verification_token=verification_token
+        )
+        
+        self.pending_brothers[pending_id] = pending_brother
+        self.save_data(self.pending_brothers_file, self.pending_brothers)
+        
+        # Notify treasurer of new registration
+        config = self.treasurer_config
+        if config.email:
+            message = f"New brother registration:\n\nName: {full_name}\nPhone: {phone}\nEmail: {email}\n\nPlease review and verify in the admin panel."
+            notify_treasurer(message, config, "New Brother Registration")
+        
+        return pending_id
+    
+    def verify_brother_with_member(self, pending_id, member_id):
+        """Link a pending brother to an existing member and create user account"""
+        if pending_id not in self.pending_brothers:
+            return False, "Pending registration not found"
+        
+        if member_id not in self.members:
+            return False, "Member not found"
+        
+        pending_brother = self.pending_brothers[pending_id]
+        member = self.members[member_id]
+        
+        # Create user account for the brother
+        username = pending_brother.email.lower()
+        temp_password = f"temp{pending_brother.id[:8]}"  # Temporary password
+        
+        if self.create_user(username, temp_password, 'brother'):
+            # Link member to user account
+            member.user_id = username
+            
+            # Update pending brother
+            pending_brother.is_verified = True
+            pending_brother.member_id = member_id
+            pending_brother.user_id = username
+            
+            # Save changes
+            self.save_data(self.members_file, self.members)
+            self.save_data(self.pending_brothers_file, self.pending_brothers)
+            
+            return True, f"Brother verified! Username: {username}, Temp password: {temp_password}"
+        
+        return False, "Failed to create user account"
+    
+    def get_member_by_user_id(self, user_id):
+        """Get member associated with a user account"""
+        for member in self.members.values():
+            if hasattr(member, 'user_id') and member.user_id == user_id:
+                return member
+        return None
+    
     def sync_to_google_sheets(self):
         """Sync data to Google Sheets (Optional - only if configured)"""
         try:
@@ -1201,6 +1484,14 @@ def require_auth(f):
     decorated_function.__name__ = f.__name__
     return decorated_function
 
+# Template context processor to make permission functions available in templates
+@app.context_processor
+def inject_permission_functions():
+    return {
+        'has_permission': has_permission,
+        'get_current_user_role': get_current_user_role
+    }
+
 # Flask routes
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -1214,7 +1505,12 @@ def login():
         session['user'] = username
         session['role'] = treasurer_app.users[username]['role']
         flash(f'Welcome, {username}!')
-        return redirect(url_for('index'))
+        
+        # Redirect based on user type
+        if treasurer_app.users[username]['role'] == 'brother':
+            return redirect(url_for('brother_dashboard'))
+        else:
+            return redirect(url_for('index'))
     else:
         flash('Invalid username or password')
         return redirect(url_for('login'))
@@ -1260,7 +1556,8 @@ def index():
                          members=treasurer_app.members,
                          budget_summary=treasurer_app.get_budget_summary(),
                          dues_summary=dues_summary,
-                         categories=BUDGET_CATEGORIES)
+                         categories=BUDGET_CATEGORIES,
+                         pending_brothers=treasurer_app.pending_brothers)
 
 @app.route('/enhanced')
 @require_auth
@@ -1274,6 +1571,7 @@ def enhanced_dashboard():
 
 @app.route('/add_member', methods=['POST'])
 @require_auth
+@require_permission('add_members')
 def add_member():
     name = request.form['name']
     contact = request.form.get('contact', request.form.get('phone', ''))  # Support both field names
@@ -1286,6 +1584,7 @@ def add_member():
 
 @app.route('/add_transaction', methods=['POST'])
 @require_auth
+@require_permission('add_transactions')
 def add_transaction():
     category = request.form['category']
     description = request.form['description']
@@ -1298,6 +1597,7 @@ def add_transaction():
 
 @app.route('/edit_transaction/<transaction_id>', methods=['GET', 'POST'])
 @require_auth
+@require_permission('edit_transactions')
 def edit_transaction(transaction_id):
     transaction = treasurer_app.get_transaction_by_id(transaction_id)
     if not transaction:
@@ -1324,6 +1624,7 @@ def edit_transaction(transaction_id):
 
 @app.route('/remove_transaction/<transaction_id>', methods=['POST'])
 @require_auth
+@require_permission('edit_transactions')
 def remove_transaction(transaction_id):
     transaction = treasurer_app.get_transaction_by_id(transaction_id)
     if transaction:
@@ -1338,6 +1639,7 @@ def remove_transaction(transaction_id):
 
 @app.route('/record_payment', methods=['POST'])
 @require_auth
+@require_permission('record_payments')
 def record_payment():
     member_id = request.form['member_id']
     amount = float(request.form['amount'])
@@ -1352,6 +1654,7 @@ def record_payment():
 
 @app.route('/send_reminders')
 @require_auth
+@require_permission('send_reminders')
 def send_reminders():
     treasurer_app.check_and_send_reminders()
     flash('Reminders sent to all eligible members!')
@@ -1359,6 +1662,7 @@ def send_reminders():
 
 @app.route('/selective_reminders', methods=['GET', 'POST'])
 @require_auth
+@require_permission('send_reminders')
 def selective_reminders():
     if request.method == 'GET':
         # Get members with outstanding balances
@@ -1393,6 +1697,7 @@ def budget_summary():
 
 @app.route('/bulk_import', methods=['GET', 'POST'])
 @require_auth
+@require_permission('add_members')
 def bulk_import():
     if request.method == 'GET':
         return render_template('bulk_import.html')
@@ -1486,6 +1791,7 @@ def bulk_import():
 
 @app.route('/confirm_bulk_import', methods=['POST'])
 @require_auth
+@require_permission('add_members')
 def confirm_bulk_import():
     # Get the confirmed member data
     member_count = int(request.form.get('member_count', 0))
@@ -1506,6 +1812,7 @@ def confirm_bulk_import():
 
 @app.route('/edit_member/<member_id>', methods=['GET', 'POST'])
 @require_auth
+@require_permission('edit_members')
 def edit_member(member_id):
     if request.method == 'GET':
         if member_id not in treasurer_app.members:
@@ -1524,8 +1831,9 @@ def edit_member(member_id):
     contact = request.form.get('contact', request.form.get('phone', ''))  # Support both field names
     dues_amount = float(request.form['dues_amount'])
     payment_plan = request.form['payment_plan']
+    role = request.form.get('role', 'brother')  # Get role assignment
     
-    if treasurer_app.update_member(member_id, name, contact, dues_amount, payment_plan):
+    if treasurer_app.update_member(member_id, name, contact, dues_amount, payment_plan, role=role):
         flash(f'Member {name} updated successfully!')
     else:
         flash('Error updating member!')
@@ -1534,6 +1842,7 @@ def edit_member(member_id):
 
 @app.route('/remove_member/<member_id>', methods=['POST'])
 @require_auth
+@require_permission('edit_members')
 def remove_member(member_id):
     if member_id in treasurer_app.members:
         member_name = treasurer_app.members[member_id].name
@@ -1564,6 +1873,7 @@ def member_details(member_id):
 
 @app.route('/budget_management', methods=['GET', 'POST'])
 @require_auth
+@require_permission('manage_budgets')
 def budget_management():
     if request.method == 'GET':
         dues_summary = treasurer_app.get_dues_collection_summary()
@@ -1585,6 +1895,7 @@ def budget_management():
 
 @app.route('/edit_budget_category/<category>', methods=['GET', 'POST'])
 @require_auth
+@require_permission('manage_budgets')
 def edit_budget_category(category):
     if category not in BUDGET_CATEGORIES:
         flash('Invalid budget category!')
@@ -1612,6 +1923,7 @@ def edit_budget_category(category):
 
 @app.route('/custom_payment_schedule/<member_id>', methods=['GET', 'POST'])
 @require_auth
+@require_permission('edit_members')
 def custom_payment_schedule(member_id):
     if member_id not in treasurer_app.members:
         flash('Member not found!')
@@ -1695,6 +2007,7 @@ def transactions():
 
 @app.route('/treasurer_setup', methods=['GET', 'POST'])
 @require_auth
+@require_permission('manage_users')
 def treasurer_setup():
     if request.method == 'GET':
         return render_template('treasurer_setup.html', config=treasurer_app.treasurer_config)
@@ -1713,6 +2026,7 @@ def treasurer_setup():
 
 @app.route('/handover_treasurer', methods=['GET', 'POST'])
 @require_auth
+@require_permission('manage_users')
 def handover_treasurer():
     if request.method == 'GET':
         return render_template('handover_treasurer.html')
@@ -1741,6 +2055,7 @@ def handover_treasurer():
 
 @app.route('/optimize_storage')
 @require_auth
+@require_permission('manage_users')
 def optimize_storage():
     """Optimize data storage and clean up files"""
     try:
@@ -1752,6 +2067,7 @@ def optimize_storage():
 
 @app.route('/semester_management', methods=['GET', 'POST'])
 @require_auth
+@require_permission('manage_users')
 def semester_management():
     if request.method == 'GET':
         semesters = list(treasurer_app.semesters.values())
@@ -1801,8 +2117,15 @@ def preview_role(role_name):
     session['preview_role'] = role_name
     session['original_role'] = 'admin'
     
-    flash(f'Now previewing dashboard as: {role_name.replace("_", " ").title()}. Click "Exit Preview" to return to treasurer view.')
-    return redirect(url_for('index'))
+    flash(f'Now previewing dashboard as: {role_name.replace("_", " ").title()}. Click "Exit Preview" to return to treasurer view.', 'info')
+    
+    # Redirect based on role type
+    if role_name in ['president', 'vice_president']:
+        # Presidents/VPs see restricted treasurer dashboard
+        return redirect(url_for('index'))
+    else:
+        # Brothers and chairs see brother dashboard
+        return redirect(url_for('brother_dashboard_preview', role_name=role_name))
 
 @app.route('/exit_preview')
 @require_auth
@@ -1817,6 +2140,7 @@ def exit_preview():
 
 @app.route('/test_sms')
 @require_auth
+@require_permission('send_reminders')
 def test_sms():
     """Test SMS functionality"""
     config = treasurer_app.treasurer_config
@@ -1867,6 +2191,7 @@ def submit_reimbursement():
 
 @app.route('/test_approval_notification')
 @require_auth
+@require_permission('send_reminders')
 def test_approval_notification():
     """Test the approval notification system"""
     config = treasurer_app.treasurer_config
@@ -1884,6 +2209,7 @@ def test_approval_notification():
 
 @app.route('/notifications')
 @require_auth
+@require_permission('send_reminders')
 def notifications_dashboard():
     """Notifications dashboard for approval requests"""
     # Check notification configuration status
@@ -1904,6 +2230,163 @@ def notifications_dashboard():
     
     return render_template('notifications_dashboard.html',
                          notification_status=notification_status)
+
+@app.route('/register', methods=['GET', 'POST'])
+def brother_registration():
+    """Brother registration form"""
+    if request.method == 'GET':
+        return render_template('brother_registration.html')
+    
+    # POST request - process registration
+    full_name = request.form.get('full_name', '').strip()
+    phone = request.form.get('phone', '').strip()
+    email = request.form.get('email', '').strip().lower()
+    
+    # Basic validation
+    if not all([full_name, phone, email]):
+        flash('All fields are required.', 'error')
+        return render_template('brother_registration.html')
+    
+    # Check if email already exists
+    if email in treasurer_app.users:
+        flash('An account with this email already exists.', 'error')
+        return render_template('brother_registration.html')
+    
+    # Check if already registered
+    for pending in treasurer_app.pending_brothers.values():
+        if pending.email.lower() == email:
+            flash('Registration with this email is already pending approval.', 'warning')
+            return render_template('brother_registration.html')
+    
+    # Register the brother
+    try:
+        pending_id = treasurer_app.register_brother(full_name, phone, email)
+        flash('Registration submitted successfully! The treasurer will review and verify your account.', 'success')
+        return render_template('brother_registration.html')
+    except Exception as e:
+        flash(f'Registration failed: {str(e)}', 'error')
+        return render_template('brother_registration.html')
+
+@app.route('/brother_dashboard_preview/<role_name>')
+@require_auth
+def brother_dashboard_preview(role_name):
+    """Preview brother dashboard as specific role (admin only)"""
+    if session.get('user') != 'admin' or not session.get('preview_mode'):
+        return redirect(url_for('brother_dashboard'))
+    
+    # Create a mock member for preview
+    from dataclasses import dataclass
+    
+    @dataclass
+    class MockMember:
+        id: str = 'preview'
+        name: str = f'Preview {role_name.replace("_", " ").title()}'
+        contact: str = 'preview@example.com'
+        dues_amount: float = 500.0
+        payment_plan: str = 'semester'
+        payments_made: list = None
+        contact_type: str = 'email'
+        role: str = role_name
+        
+        def __post_init__(self):
+            if self.payments_made is None:
+                self.payments_made = [
+                    {'amount': 250.0, 'date': '2024-09-01', 'method': 'Zelle', 'id': 'preview1'}
+                ]
+    
+    mock_member = MockMember()
+    balance = 250.0  # Mock balance
+    
+    # Mock payment schedule
+    payment_schedule = [
+        {'description': 'Full semester payment', 'due_date': '2024-09-01', 'amount': 500.0, 'status': 'paid'},
+    ]
+    
+    # Get summary data based on permissions
+    data = {
+        'member': mock_member,
+        'balance': balance,
+        'payment_schedule': payment_schedule
+    }
+    
+    # Add additional data for executives
+    if role_name in ['president', 'vice_president']:
+        data.update({
+            'total_members': len(treasurer_app.members),
+            'dues_summary': treasurer_app.get_dues_collection_summary(),
+            'budget_summary': treasurer_app.get_budget_summary()
+        })
+    elif role_name in ['social_chair', 'phi_ed_chair', 'brotherhood_chair', 'recruitment_chair']:
+        data.update({
+            'budget_summary': treasurer_app.get_budget_summary()
+        })
+    
+    return render_template('brother_dashboard.html', **data)
+
+@app.route('/brother_dashboard')
+@require_auth
+def brother_dashboard():
+    """Brother-specific dashboard with role-based content"""
+    # Get current user's member info
+    member = get_user_member()
+    if not member:
+        flash('Member information not found. Please contact the treasurer.', 'error')
+        return redirect(url_for('logout'))
+    
+    # Calculate member's balance
+    balance = treasurer_app.get_member_balance(member.id)
+    
+    # Get payment schedule
+    payment_schedule = treasurer_app.get_member_payment_schedule(member.id)
+    
+    # Get summary data based on permissions
+    data = {
+        'member': member,
+        'balance': balance,
+        'payment_schedule': payment_schedule
+    }
+    
+    # Add additional data for executives
+    if has_permission('view_all_data'):
+        data.update({
+            'total_members': len(treasurer_app.members),
+            'dues_summary': treasurer_app.get_dues_collection_summary(),
+            'budget_summary': treasurer_app.get_budget_summary()
+        })
+    
+    return render_template('brother_dashboard.html', **data)
+
+@app.route('/verify_brothers', methods=['GET', 'POST'])
+@require_auth
+@require_permission('manage_users')
+def verify_brothers():
+    """Treasurer interface to verify pending brother registrations"""
+    if request.method == 'GET':
+        return render_template('verify_brothers.html',
+                             pending_brothers=treasurer_app.pending_brothers,
+                             members=treasurer_app.members)
+    
+    # POST request - process verification
+    pending_id = request.form.get('pending_id')
+    member_id = request.form.get('member_id')
+    action = request.form.get('action')
+    
+    if action == 'verify' and pending_id and member_id:
+        success, message = treasurer_app.verify_brother_with_member(pending_id, member_id)
+        if success:
+            flash(message, 'success')
+        else:
+            flash(message, 'error')
+    elif action == 'reject' and pending_id:
+        # Remove pending registration
+        if pending_id in treasurer_app.pending_brothers:
+            del treasurer_app.pending_brothers[pending_id]
+            treasurer_app.save_data(treasurer_app.pending_brothers_file, treasurer_app.pending_brothers)
+            flash('Registration rejected and removed.', 'info')
+        else:
+            flash('Registration not found.', 'error')
+    
+    return redirect(url_for('verify_brothers'))
 
 @app.route('/ai_assistant', methods=['GET', 'POST'])
 @require_auth

@@ -84,6 +84,21 @@
                                             </option>
                                         </select>
                                     </div>
+                                    {% if has_permission('assign_roles') %}
+                                    <div class="mb-3">
+                                        <label for="role" class="form-label">Fraternity Role</label>
+                                        <select class="form-control" id="role" name="role">
+                                            <option value="brother" {{ 'selected' if member.role == 'brother' or not member.role }}>Brother</option>
+                                            <option value="president" {{ 'selected' if member.role == 'president' }}>President</option>
+                                            <option value="vice_president" {{ 'selected' if member.role == 'vice_president' }}>Vice President</option>
+                                            <option value="social_chair" {{ 'selected' if member.role == 'social_chair' }}>Social Chair</option>
+                                            <option value="phi_ed_chair" {{ 'selected' if member.role == 'phi_ed_chair' }}>Phi Ed Chair</option>
+                                            <option value="brotherhood_chair" {{ 'selected' if member.role == 'brotherhood_chair' }}>Brotherhood Chair</option>
+                                            <option value="recruitment_chair" {{ 'selected' if member.role == 'recruitment_chair' }}>Recruitment Chair</option>
+                                        </select>
+                                        <small class="text-muted">Assign executive positions to members</small>
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="d-flex justify-content-between">

@@ -57,12 +57,25 @@ ROLE_PERMISSIONS = {
         'view_all_transactions': True,
         'view_all_members': True,
         'view_budgets': True,
+        'view_all_budgets': True,
         
-        # Cannot edit anything
+        # Cannot edit, manage, or send anything
         'edit_all_data': False,
         'manage_users': False,
         'approve_requests': False,
         'manage_budgets': False,
+        'send_reminders': False,
+        'add_transactions': False,
+        'edit_transactions': False,
+        'delete_transactions': False,
+        'add_members': False,
+        'edit_members': False,
+        'delete_members': False,
+        'record_payments': False,
+        'manage_semesters': False,
+        'system_administration': False,
+        'submit_reimbursement': False,
+        'approve_reimbursements': False,
     },
     
     'vice_president': {
