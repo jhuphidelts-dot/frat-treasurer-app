@@ -463,43 +463,85 @@ class TreasurerConfig:
 
 class TreasurerApp:
     def __init__(self):
-        self.data_dir = os.path.join(os.path.dirname(__file__), 'data')
-        self.members_file = os.path.join(self.data_dir, 'members.json')
-        self.transactions_file = os.path.join(self.data_dir, 'transactions.json')
-        self.budget_file = os.path.join(self.data_dir, 'budget.json')
-        self.users_file = os.path.join(self.data_dir, 'users.json')
-        self.semesters_file = os.path.join(self.data_dir, 'semesters.json')
-        self.treasurer_config_file = os.path.join(self.data_dir, 'treasurer_config.json')
-        self.pending_brothers_file = os.path.join(self.data_dir, 'pending_brothers.json')
+        try:
+            self.data_dir = os.path.join(os.path.dirname(__file__), 'data')
+            self.members_file = os.path.join(self.data_dir, 'members.json')
+            self.transactions_file = os.path.join(self.data_dir, 'transactions.json')
+            self.budget_file = os.path.join(self.data_dir, 'budget.json')
+            self.users_file = os.path.join(self.data_dir, 'users.json')
+            self.semesters_file = os.path.join(self.data_dir, 'semesters.json')
+            self.treasurer_config_file = os.path.join(self.data_dir, 'treasurer_config.json')
+            self.pending_brothers_file = os.path.join(self.data_dir, 'pending_brothers.json')
+            
+            print(f"📁 Data directory: {self.data_dir}")
+            
+            # Create data directory if it doesn't exist
+            os.makedirs(self.data_dir, exist_ok=True)
+            print(f"✅ Data directory created/verified")
         
-        # Create data directory if it doesn't exist
-        os.makedirs(self.data_dir, exist_ok=True)
+            # Load existing data or initialize empty
+            print(f"📄 Loading data files...")
+            self.members = self.load_data(self.members_file, {})
+            print(f"✅ Members loaded: {len(self.members)} members")
+            
+            self.transactions = self.load_data(self.transactions_file, [])
+            print(f"✅ Transactions loaded: {len(self.transactions)} transactions")
+            
+            self.budget_limits = self.load_data(self.budget_file, {category: 0.0 for category in BUDGET_CATEGORIES})
+            print(f"✅ Budget limits loaded")
+            
+            self.users = self.load_data(self.users_file, {})
+            print(f"✅ Users loaded: {len(self.users)} users")
+            
+            self.semesters = self.load_data(self.semesters_file, {})
+            print(f"✅ Semesters loaded: {len(self.semesters)} semesters")
+            
+            self.treasurer_config = self.load_treasurer_config()
+            print(f"✅ Treasurer config loaded")
+            
+            self.pending_brothers = self.load_data(self.pending_brothers_file, {})
+            print(f"✅ Pending brothers loaded: {len(self.pending_brothers)} pending")
         
-        # Load existing data or initialize empty
-        self.members = self.load_data(self.members_file, {})
-        self.transactions = self.load_data(self.transactions_file, [])
-        self.budget_limits = self.load_data(self.budget_file, {category: 0.0 for category in BUDGET_CATEGORIES})
-        self.users = self.load_data(self.users_file, {})
-        self.semesters = self.load_data(self.semesters_file, {})
-        self.treasurer_config = self.load_treasurer_config()
-        self.pending_brothers = self.load_data(self.pending_brothers_file, {})
-        
-        # Create default admin user if no users exist
-        if not self.users:
-            self.create_user('admin', 'admin123', 'admin')
-        
-        # Initialize current semester if none exists
-        if not self.semesters:
-            self.create_default_semester()
-        
-        self.current_semester = self.get_current_semester()
-        
-        self.scheduler = BackgroundScheduler()
-        self.scheduler.start()
-        self.setup_reminders()
-        
-        # Auto-optimize storage on startup (lightweight check)
-        self._auto_optimize_if_needed()
+            # Create default admin user if no users exist
+            if not self.users:
+                print(f"👤 Creating default admin user...")
+                self.create_user('admin', 'admin123', 'admin')
+                print(f"✅ Default admin user created")
+            
+            # Initialize current semester if none exists
+            if not self.semesters:
+                print(f"📅 Creating default semester...")
+                self.create_default_semester()
+                print(f"✅ Default semester created")
+            
+            self.current_semester = self.get_current_semester()
+            print(f"✅ Current semester set")
+            
+            # Initialize scheduler with error handling
+            try:
+                print(f"⏰ Starting background scheduler...")
+                self.scheduler = BackgroundScheduler()
+                self.scheduler.start()
+                self.setup_reminders()
+                print(f"✅ Background scheduler started")
+            except Exception as e:
+                print(f"⚠️ Scheduler failed to start: {e} (continuing without scheduler)")
+                self.scheduler = None
+            
+            # Auto-optimize storage on startup (lightweight check)
+            try:
+                self._auto_optimize_if_needed()
+                print(f"✅ Storage optimization check completed")
+            except Exception as e:
+                print(f"⚠️ Storage optimization failed: {e} (continuing)")
+            
+            print(f"🎉 TreasurerApp initialization completed successfully!")
+            
+        except Exception as e:
+            print(f"❌ CRITICAL ERROR during TreasurerApp initialization: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
 
     def load_data(self, file_path, default_data):
         # Check for compressed version first
