@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 import hashlib
 import re
 import calendar
+import time
 
 # Import Flask blueprints
 # from notifications import notifications_bp  # Commented out due to compatibility issues
@@ -169,24 +170,40 @@ def notify_spending_plan_request(submitter_name, category, amount, description, 
     return notify_treasurer(message, config, "Spending Plan Request")
 
 def send_brother_credentials_sms(full_name, phone, username, password, config):
-    """Send login credentials to approved brother via SMS"""
+    """Send login credentials to approved brother via SMS with enhanced logging"""
+    print(f"\n🔐 Starting brother credentials SMS process...")
+    print(f"   Full name: {full_name}")
+    print(f"   Phone: {phone}")
+    print(f"   Username: {username}")
+    
     if not config.smtp_username or not config.smtp_password:
-        print("Brother SMS Error: SMTP credentials not configured")
+        print("❌ Brother SMS Error: SMTP credentials not configured")
+        print(f"   SMTP Username: {config.smtp_username}")
+        print(f"   SMTP Password configured: {bool(config.smtp_password)}")
         return False
     
     # Create concise SMS message (SMS has 160 char limit)
     first_name = full_name.split()[0] if full_name else "Brother"
     message = f"Fraternity Account Approved! Hi {first_name}, Login: {username} Pass: {password} Change password after first login."
     
-    print(f"\n📱 Sending brother credentials to {first_name} at {phone}")
+    # Check message length
+    if len(message) > 160:
+        # Create shorter version
+        message = f"Account approved! {first_name}, Login: {username} Pass: {password}"
+        print(f"📏 Message shortened to {len(message)} chars: {message}")
+    else:
+        print(f"📏 Message length OK: {len(message)} chars")
     
-    # Send SMS via email-to-SMS gateway
+    print(f"📱 Sending brother credentials to {first_name} at {phone}")
+    
+    # Send SMS via email-to-SMS gateway with enhanced error reporting
     success = send_email_to_sms(phone, message, config)
     
     if success:
         print(f"✅ Brother credentials SMS sent successfully to {phone}")
     else:
         print(f"❌ Brother credentials SMS failed to {phone}")
+        print(f"🔧 Debug: Config status - SMTP User: {config.smtp_username}, Phone: {phone}")
     
     return success
 
@@ -577,7 +594,10 @@ class TreasurerApp:
                             payment_plan=member_data['payment_plan'],
                             custom_schedule=member_data.get('custom_schedule', []),
                             payments_made=member_data.get('payments_made', []),
-                            contact_type=contact_type
+                            contact_type=contact_type,
+                            semester_id=member_data.get('semester_id', 'current'),
+                            role=member_data.get('role', 'brother'),
+                            user_id=member_data.get('user_id')
                         )
                     return loaded_members
                 # Convert loaded transactions back to Transaction objects if needed
@@ -701,28 +721,162 @@ class TreasurerApp:
                         pass
     
     def optimize_data_storage(self):
-        """Optimize all data files for storage"""
-        print("Optimizing data storage...")
+        """Aggressive data storage optimization for Render deployment"""
+        print("\n💾 OPTIMIZING STORAGE FOR RENDER DEPLOYMENT")
+        print("=" * 60)
         
-        # Recompress all large files
+        # Get initial storage usage
+        initial_size = self._get_data_directory_size()
+        print(f"📁 Initial data directory size: {initial_size / 1024:.1f} KB")
+        
+        # Recompress all data files with maximum compression
         data_files = [
-            self.members_file,
-            self.transactions_file,
-            self.budget_file,
-            self.semesters_file
+            (self.members_file, "Members"),
+            (self.transactions_file, "Transactions"), 
+            (self.budget_file, "Budget"),
+            (self.semesters_file, "Semesters"),
+            (self.pending_brothers_file, "Pending Brothers"),
+            (self.users_file, "Users")
         ]
         
-        for file_path in data_files:
-            if os.path.exists(file_path):
-                # Load and resave to trigger compression
-                data = self.load_data(file_path, {})
-                if data:
-                    self.save_data(file_path, data)
+        for file_path, file_type in data_files:
+            if os.path.exists(file_path) or os.path.exists(file_path + '.gz'):
+                print(f"\n🗜 Optimizing {file_type}...")
+                try:
+                    # Load data
+                    data = self.load_data(file_path, {} if file_type != "Transactions" else [])
+                    
+                    if data and len(data) > 0:
+                        # Force recompression with maximum settings
+                        old_size = 0
+                        if os.path.exists(file_path):
+                            old_size = os.path.getsize(file_path)
+                        elif os.path.exists(file_path + '.gz'):
+                            old_size = os.path.getsize(file_path + '.gz')
+                        
+                        self.save_data(file_path, data)
+                        
+                        new_size = 0
+                        if os.path.exists(file_path):
+                            new_size = os.path.getsize(file_path)
+                        elif os.path.exists(file_path + '.gz'):
+                            new_size = os.path.getsize(file_path + '.gz')
+                        
+                        if old_size > 0:
+                            savings = old_size - new_size
+                            print(f"   {old_size} -> {new_size} bytes (saved {savings} bytes)")
+                        else:
+                            print(f"   Size: {new_size} bytes")
+                    else:
+                        print(f"   No data to optimize")
+                        
+                except Exception as e:
+                    print(f"   ❌ Error optimizing {file_type}: {e}")
         
-        # Cleanup unnecessary files
-        self.cleanup_old_files()
+        # Aggressive cleanup of unnecessary files
+        print(f"\n🧹 Cleaning up unnecessary files...")
+        cleanup_count = self._aggressive_cleanup()
+        print(f"   Removed {cleanup_count} unnecessary files")
         
-        print("Data storage optimization complete!")
+        # Remove old backup files if space is tight
+        backup_count = self._cleanup_old_backups()
+        print(f"   Removed {backup_count} old backup files")
+        
+        # Final storage report
+        final_size = self._get_data_directory_size()
+        savings = initial_size - final_size
+        savings_percent = (savings / initial_size * 100) if initial_size > 0 else 0
+        
+        print(f"\n🎉 STORAGE OPTIMIZATION COMPLETE")
+        print(f"   Before: {initial_size / 1024:.1f} KB")
+        print(f"   After:  {final_size / 1024:.1f} KB")
+        print(f"   Saved:  {savings / 1024:.1f} KB ({savings_percent:.1f}%)")
+        print(f"   Total data directory size: {final_size / 1024:.1f} KB")
+        
+        # Warning if still too large
+        if final_size > 50 * 1024 * 1024:  # 50MB warning
+            print(f"\n⚠️ WARNING: Data directory is {final_size / 1024 / 1024:.1f} MB")
+            print(f"   Consider archiving old data for Render deployment")
+        
+        return final_size
+    
+    def _get_data_directory_size(self):
+        """Calculate total size of data directory"""
+        total_size = 0
+        for dirpath, dirnames, filenames in os.walk(self.data_dir):
+            for filename in filenames:
+                filepath = os.path.join(dirpath, filename)
+                try:
+                    total_size += os.path.getsize(filepath)
+                except (OSError, FileNotFoundError):
+                    pass
+        return total_size
+    
+    def _aggressive_cleanup(self):
+        """Aggressively clean up unnecessary files"""
+        cleanup_count = 0
+        patterns_to_remove = [
+            '*.pyc', '*.pyo', '*.pyd', '__pycache__',
+            '.DS_Store', '._.DS_Store', 'Thumbs.db',
+            '*.tmp', '*.temp', '*.log', '*.bak',
+            '.pytest_cache', '.coverage', '*.backup.backup'  # Double backups
+        ]
+        
+        for root, dirs, files in os.walk(self.data_dir.replace('/data', '')):
+            # Remove cache directories
+            if '__pycache__' in dirs:
+                import shutil
+                cache_path = os.path.join(root, '__pycache__')
+                try:
+                    shutil.rmtree(cache_path)
+                    cleanup_count += 1
+                except Exception:
+                    pass
+                dirs.remove('__pycache__')
+            
+            # Remove unwanted files
+            for file in files:
+                file_path = os.path.join(root, file)
+                should_remove = False
+                
+                for pattern in patterns_to_remove:
+                    if pattern.startswith('*.'):
+                        if file.endswith(pattern[1:]):
+                            should_remove = True
+                            break
+                    elif file == pattern:
+                        should_remove = True
+                        break
+                
+                if should_remove:
+                    try:
+                        os.remove(file_path)
+                        cleanup_count += 1
+                    except Exception:
+                        pass
+        
+        return cleanup_count
+    
+    def _cleanup_old_backups(self):
+        """Remove old backup files to save space"""
+        backup_count = 0
+        backup_extensions = ['.backup', '.bak']
+        
+        for root, dirs, files in os.walk(self.data_dir):
+            for file in files:
+                for ext in backup_extensions:
+                    if file.endswith(ext):
+                        file_path = os.path.join(root, file)
+                        try:
+                            # Keep only recent backups (created in last 7 days)
+                            file_age = time.time() - os.path.getctime(file_path)
+                            if file_age > 7 * 24 * 60 * 60:  # 7 days
+                                os.remove(file_path)
+                                backup_count += 1
+                        except Exception:
+                            pass
+        
+        return backup_count
     
     def _auto_optimize_if_needed(self):
         """Automatically optimize if files are getting large"""
@@ -784,6 +938,10 @@ class TreasurerApp:
             return self.get_current_semester()
 
     def save_data(self, file_path, data):
+        """Enhanced save_data with backup, compression, and error recovery"""
+        print(f"\n💾 SAVING DATA: {os.path.basename(file_path)}")
+        print(f"   Data size: {len(str(data))} items")
+        
         # Convert objects to dictionaries for JSON serialization
         if 'members.json' in file_path:
             serialized_data = {}
@@ -802,18 +960,85 @@ class TreasurerApp:
         else:
             serialized_data = data
         
-        # Use compression for large files
-        if self.should_compress_file(file_path) or len(str(serialized_data)) > 5000:
-            compressed_path = file_path + '.gz'
-            with gzip.open(compressed_path, 'wt', encoding='utf-8') as f:
-                json.dump(serialized_data, f, separators=(',', ':'))  # Compact JSON
-            # Remove uncompressed version if it exists
-            if os.path.exists(file_path):
-                os.remove(file_path)
-        else:
-            # Save normally for small files
-            with open(file_path, 'w') as f:
-                json.dump(serialized_data, f, separators=(',', ':'))  # Compact JSON
+        # Create backup before saving (for critical data)
+        backup_created = False
+        if 'members.json' in file_path or 'users.json' in file_path:
+            try:
+                self._create_backup(file_path)
+                backup_created = True
+                print(f"   ✅ Backup created")
+            except Exception as e:
+                print(f"   ⚠️ Backup failed: {e}")
+        
+        # Determine if compression is needed (optimize for Render space limits)
+        json_size = len(json.dumps(serialized_data, separators=(',', ':')))
+        should_compress = json_size > 3000  # Lower threshold for better space efficiency
+        
+        try:
+            if should_compress:
+                compressed_path = file_path + '.gz'
+                print(f"   🗜 Compressing: {json_size} bytes -> ", end="")
+                
+                with gzip.open(compressed_path, 'wt', encoding='utf-8') as f:
+                    json.dump(serialized_data, f, separators=(',', ':'))  # Most compact JSON
+                
+                compressed_size = os.path.getsize(compressed_path)
+                compression_ratio = (1 - compressed_size / json_size) * 100
+                print(f"{compressed_size} bytes ({compression_ratio:.1f}% saved)")
+                
+                # Remove uncompressed version to save space
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    print(f"   🗑️ Removed uncompressed version")
+            else:
+                # Save normally for small files
+                with open(file_path, 'w') as f:
+                    json.dump(serialized_data, f, separators=(',', ':'))  # Compact JSON
+                print(f"   💾 Saved uncompressed: {json_size} bytes")
+            
+            # Verify the save worked
+            test_load = self.load_data(file_path, None)
+            if test_load is None or (isinstance(test_load, (dict, list)) and len(test_load) == 0 and len(serialized_data) > 0):
+                raise Exception("Save verification failed - data not found after save")
+            
+            print(f"   ✅ Save successful and verified")
+            
+        except Exception as e:
+            print(f"   ❌ Save failed: {e}")
+            
+            # Try to restore from backup if available
+            if backup_created:
+                try:
+                    self._restore_from_backup(file_path)
+                    print(f"   ⚙️ Restored from backup")
+                except Exception as backup_e:
+                    print(f"   ❌ Backup restore also failed: {backup_e}")
+            
+            # Re-raise the original error
+            raise e
+    
+    def _create_backup(self, file_path):
+        """Create a backup of critical data files"""
+        if os.path.exists(file_path):
+            backup_path = file_path + '.backup'
+            import shutil
+            shutil.copy2(file_path, backup_path)
+        elif os.path.exists(file_path + '.gz'):
+            backup_path = file_path + '.gz.backup'
+            import shutil
+            shutil.copy2(file_path + '.gz', backup_path)
+    
+    def _restore_from_backup(self, file_path):
+        """Restore data from backup"""
+        backup_path = file_path + '.backup'
+        gz_backup_path = file_path + '.gz.backup'
+        
+        if os.path.exists(backup_path):
+            import shutil
+            shutil.copy2(backup_path, file_path)
+        elif os.path.exists(gz_backup_path):
+            import shutil
+            shutil.copy2(gz_backup_path, file_path + '.gz')
         
     def setup_reminders(self):
         """Set up automated reminder jobs"""
@@ -1488,30 +1713,72 @@ class TreasurerApp:
         return True
     
     def register_brother(self, full_name, phone, email):
-        """Register a new brother account for verification"""
+        """Register a new brother account for verification with enhanced data validation and backup"""
         import secrets
+        
+        print(f"\n👥 REGISTERING NEW BROTHER")
+        print(f"   Name: {full_name}")
+        print(f"   Phone: {phone}")
+        print(f"   Email: {email}")
+        
+        # Validate input data
+        if not full_name.strip() or not phone.strip() or not email.strip():
+            raise ValueError("All fields (name, phone, email) are required")
+        
+        if '@' not in email or '.' not in email:
+            raise ValueError("Invalid email format")
+        
+        # Clean phone number
+        clean_phone = ''.join(filter(str.isdigit, phone))
+        if len(clean_phone) < 10:
+            raise ValueError("Phone number must contain at least 10 digits")
         
         pending_id = str(uuid.uuid4())
         verification_token = secrets.token_urlsafe(32)
         
         pending_brother = PendingBrother(
             id=pending_id,
-            full_name=full_name,
-            phone=phone,
-            email=email,
+            full_name=full_name.strip(),
+            phone=phone.strip(),
+            email=email.strip().lower(),
             registration_date=datetime.now().isoformat(),
             verification_token=verification_token
         )
         
+        # Add to pending brothers dictionary
         self.pending_brothers[pending_id] = pending_brother
-        self.save_data(self.pending_brothers_file, self.pending_brothers)
+        print(f"   Generated ID: {pending_id}")
+        print(f"   Total pending brothers: {len(self.pending_brothers)}")
+        
+        # Save with error handling
+        try:
+            self.save_data(self.pending_brothers_file, self.pending_brothers)
+            print(f"✅ Pending brother data saved successfully")
+            
+            # Verify the save worked by reloading
+            reloaded_pending = self.load_data(self.pending_brothers_file, {})
+            if pending_id in reloaded_pending:
+                print(f"✅ Verified: Pending brother {pending_id} found after save")
+            else:
+                print(f"❌ Warning: Pending brother {pending_id} not found after save!")
+                
+        except Exception as e:
+            print(f"❌ Error saving pending brother data: {e}")
+            raise
         
         # Notify treasurer of new registration
         config = self.treasurer_config
-        if config.email:
+        if config.email and config.smtp_username and config.smtp_password:
             message = f"New brother registration:\n\nName: {full_name}\nPhone: {phone}\nEmail: {email}\n\nPlease review and verify in the admin panel."
-            notify_treasurer(message, config, "New Brother Registration")
+            try:
+                notify_treasurer(message, config, "New Brother Registration")
+                print(f"✅ Treasurer notification sent")
+            except Exception as e:
+                print(f"❌ Treasurer notification failed: {e}")
+        else:
+            print(f"❌ Treasurer notification skipped - email not configured")
         
+        print(f"🎉 Brother registration completed successfully!\n")
         return pending_id
     
     def verify_brother_with_member(self, pending_id, member_id):
@@ -2622,12 +2889,37 @@ def brother_dashboard():
     
     return render_template('brother_dashboard.html', **data)
 
+@app.route('/debug_pending_brothers')
+@require_auth
+@require_permission('manage_users')
+def debug_pending_brothers():
+    """Debug route to check pending brothers status"""
+    print(f"\n🔍 DEBUGGING PENDING BROTHERS")
+    print(f"   Pending brothers file: {treasurer_app.pending_brothers_file}")
+    print(f"   File exists: {os.path.exists(treasurer_app.pending_brothers_file)}")
+    print(f"   Compressed file exists: {os.path.exists(treasurer_app.pending_brothers_file + '.gz')}")
+    
+    # Force reload from disk
+    treasurer_app.pending_brothers = treasurer_app.load_data(treasurer_app.pending_brothers_file, {})
+    print(f"   Current pending brothers count: {len(treasurer_app.pending_brothers)}")
+    
+    for pending_id, pending_brother in treasurer_app.pending_brothers.items():
+        print(f"   - {pending_id}: {pending_brother.full_name} ({pending_brother.email})")
+    
+    flash(f'Debug complete: {len(treasurer_app.pending_brothers)} pending brothers found. Check console for details.')
+    return redirect(url_for('verify_brothers'))
+
 @app.route('/verify_brothers', methods=['GET', 'POST'])
 @require_auth
 @require_permission('manage_users')
 def verify_brothers():
     """Treasurer interface to verify pending brother registrations"""
     if request.method == 'GET':
+        # Force reload pending brothers from disk
+        treasurer_app.pending_brothers = treasurer_app.load_data(treasurer_app.pending_brothers_file, {})
+        print(f"\n👥 VERIFY BROTHERS PAGE LOAD")
+        print(f"   Pending brothers count: {len(treasurer_app.pending_brothers)}")
+        
         return render_template('verify_brothers.html',
                              pending_brothers=treasurer_app.pending_brothers,
                              members=treasurer_app.members)
