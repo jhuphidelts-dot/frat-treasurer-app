@@ -282,6 +282,9 @@
                             <li><a class="dropdown-item" href="{{ url_for('role_management') }}">
                                 <i class="bi bi-people-fill"></i> Manage Roles
                             </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('credential_management') }}">
+                                <i class="bi bi-key"></i> Brother Credentials
+                            </a></li>
                             {% endif %}
                             <li><a class="dropdown-item" href="{{ url_for('change_password') }}">
                                 <i class="bi bi-key"></i> Change Password
@@ -342,6 +345,7 @@
                     </div>
                 </div>
             </div>
+            {% if has_permission('view_dues_summary') %}
             <div class="col-md-3">
                 <div class="card bg-success text-white">
                     <div class="card-body">
@@ -360,18 +364,8 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card bg-info text-white">
-                    <div class="card-body">
-                        <h5 class="card-title">Total Expenses</h5>
-                        {% set total_expenses = 0 %}
-                        {% for summary in budget_summary.values() %}
-                            {% set total_expenses = total_expenses + summary.spent %}
-                        {% endfor %}
-                        <h2>${{ "%.2f"|format(total_expenses) }}</h2>
-                    </div>
-                </div>
-            </div>
+            {% endif %}
+            <!-- Remove Total Expenses card as it doesn't calculate correctly -->
         </div>
 
         <div class="row">
@@ -420,11 +414,15 @@
                                         <th>Name</th>
                                         <th>Role</th>
                                         <th>Contact</th>
+                                        {% if has_permission('view_member_finances') %}
                                         <th>Dues</th>
                                         <th>Paid</th>
                                         <th>Balance</th>
                                         <th>Status</th>
+                                        {% endif %}
+                                        {% if has_permission('edit_members') %}
                                         <th>Actions</th>
+                                        {% endif %}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -449,6 +447,7 @@
                                             </span>
                                             <small>{{ member.contact[:20] }}{% if member.contact|length > 20 %}...{% endif %}</small>
                                         </td>
+                                        {% if has_permission('view_member_finances') %}
                                         <td>${{ "%.2f"|format(member.dues_amount) }}</td>
                                         <td>${{ "%.2f"|format(total_paid) }}</td>
                                         <td>${{ "%.2f"|format(balance) }}</td>
@@ -459,8 +458,9 @@
                                                 <span class="overdue">Owes ${{ "%.2f"|format(balance) }}</span>
                                             {% endif %}
                                         </td>
+                                        {% endif %}
+                                        {% if has_permission('edit_members') %}
                                         <td>
-                                            {% if has_permission('edit_members') %}
                                             <div class="btn-group btn-group-sm" role="group">
                                                 <a href="/edit_member/{{ member_id }}" class="btn btn-outline-primary btn-sm" title="Edit">
                                                     ✏️
@@ -472,10 +472,8 @@
                                                     </button>
                                                 </form>
                                             </div>
-                                            {% else %}
-                                            <span class="text-muted">View Only</span>
-                                            {% endif %}
                                         </td>
+                                        {% endif %}
                                     </tr>
                                     {% endfor %}
                                 </tbody>

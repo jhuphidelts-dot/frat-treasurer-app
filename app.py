@@ -239,12 +239,22 @@ MEMBER_ROLE_PERMISSIONS = {
         'record_payments': True,
         'manage_budgets': True,
         'assign_roles': True,
+        'view_dues_info': True,
+        'view_member_finances': True,
+        'view_dues_summary': True,
+        'submit_spending_plan': True,
+        'submit_budget_increase': True,
+        'submit_reimbursement': True,
+        'submit_payment_plan': True,
+        'view_all_contacts': True,
     },
     'brother': {
-        # Basic brother access
+        # Basic brother access - can only see own dues, all contacts, submit requests
         'view_all_data': False,
         'view_own_data': True,
-        'view_dues_info': True,
+        'view_dues_info': True,  # Can see own dues only
+        'view_member_finances': False,  # Cannot see other members' finances
+        'view_dues_summary': False,  # Cannot see dues summary
         'edit_all_data': False,
         'manage_users': False,
         'send_reminders': False,
@@ -255,12 +265,19 @@ MEMBER_ROLE_PERMISSIONS = {
         'record_payments': False,
         'manage_budgets': False,
         'assign_roles': False,
+        'submit_spending_plan': False,
+        'submit_budget_increase': False,
+        'submit_reimbursement': True,   # Can submit reimbursement requests
+        'submit_payment_plan': True,    # Can submit payment plan requests
+        'view_all_contacts': True,      # Can view all brother names/contacts
     },
     'president': {
-        # President access - read all financial data
+        # President access - can see all dues/finances but cannot edit
         'view_all_data': True,
         'view_own_data': True,
         'view_dues_info': True,
+        'view_member_finances': True,   # Can see all member finances
+        'view_dues_summary': True,      # Can see dues collected/projected
         'edit_all_data': False,
         'manage_users': False,
         'send_reminders': False,
@@ -271,30 +288,43 @@ MEMBER_ROLE_PERMISSIONS = {
         'record_payments': False,
         'manage_budgets': False,
         'assign_roles': False,
+        'submit_spending_plan': False,
+        'submit_budget_increase': False,
+        'submit_reimbursement': True,
+        'submit_payment_plan': False,
+        'view_all_contacts': True,
     },
     'vice_president': {
-        # VP access - STRICTLY READ-ONLY, no management capabilities
-        'view_all_data': False,  # Cannot view all member data
-        'view_own_data': True,   # Can only view own data
-        'view_dues_info': False, # NO individual dues access
-        'view_general_budget': True,  # Can see general budget info only
-        'edit_all_data': False,  # NO editing
-        'manage_users': False,   # NO user management
-        'send_reminders': False, # NO reminder sending
-        'add_transactions': False,  # NO transaction adding
-        'edit_transactions': False, # NO transaction editing
-        'add_members': False,    # NO member adding
-        'edit_members': False,   # NO member editing
-        'record_payments': False, # NO payment recording
-        'manage_budgets': False, # NO budget management
-        'assign_roles': False,   # NO role assignment
+        # VP access - can see dues summary but NOT individual finances
+        'view_all_data': False,
+        'view_own_data': True,
+        'view_dues_info': True,         # Can see own dues only
+        'view_member_finances': False,  # CANNOT see individual finances
+        'view_dues_summary': True,      # Can see general dues collected/projected
+        'edit_all_data': False,
+        'manage_users': False,
+        'send_reminders': False,
+        'add_transactions': False,
+        'edit_transactions': False,
+        'add_members': False,
+        'edit_members': False,
+        'record_payments': False,
+        'manage_budgets': False,
+        'assign_roles': False,
+        'submit_spending_plan': False,
+        'submit_budget_increase': False,
+        'submit_reimbursement': True,
+        'submit_payment_plan': False,
+        'view_all_contacts': True,
     },
     'social_chair': {
-        # Social chair - view social budget and expenses only
+        # Chair access - view own department budget only, submit requests
         'view_all_data': False,
         'view_own_data': True,
-        'view_dues_info': False,  # No individual dues access
-        'view_social_budget': True,
+        'view_dues_info': True,         # Can see own dues only
+        'view_member_finances': False,  # Cannot see other member finances
+        'view_dues_summary': False,     # Cannot see dues summary
+        'view_social_budget': True,     # Can see social budget only
         'edit_all_data': False,
         'manage_users': False,
         'send_reminders': False,
@@ -305,13 +335,20 @@ MEMBER_ROLE_PERMISSIONS = {
         'record_payments': False,
         'manage_budgets': False,
         'assign_roles': False,
+        'submit_spending_plan': True,   # Can submit spending plans
+        'submit_budget_increase': True, # Can request budget increases
+        'submit_reimbursement': True,   # Can submit reimbursements
+        'submit_payment_plan': False,
+        'view_all_contacts': True,
     },
     'phi_ed_chair': {
-        # Phi Ed chair access
+        # Chair access - view own department budget only, submit requests
         'view_all_data': False,
         'view_own_data': True,
-        'view_dues_info': False,  # No individual dues access
-        'view_phi_ed_budget': True,
+        'view_dues_info': True,         # Can see own dues only
+        'view_member_finances': False,  # Cannot see other member finances
+        'view_dues_summary': False,     # Cannot see dues summary
+        'view_phi_ed_budget': True,     # Can see phi ed budget only
         'edit_all_data': False,
         'manage_users': False,
         'send_reminders': False,
@@ -322,13 +359,20 @@ MEMBER_ROLE_PERMISSIONS = {
         'record_payments': False,
         'manage_budgets': False,
         'assign_roles': False,
+        'submit_spending_plan': True,   # Can submit spending plans
+        'submit_budget_increase': True, # Can request budget increases
+        'submit_reimbursement': True,   # Can submit reimbursements
+        'submit_payment_plan': False,
+        'view_all_contacts': True,
     },
     'brotherhood_chair': {
-        # Brotherhood chair access
+        # Chair access - view own department budget only, submit requests
         'view_all_data': False,
         'view_own_data': True,
-        'view_dues_info': False,  # No individual dues access
-        'view_brotherhood_budget': True,
+        'view_dues_info': True,         # Can see own dues only
+        'view_member_finances': False,  # Cannot see other member finances
+        'view_dues_summary': False,     # Cannot see dues summary
+        'view_brotherhood_budget': True, # Can see brotherhood budget only
         'edit_all_data': False,
         'manage_users': False,
         'send_reminders': False,
@@ -339,13 +383,20 @@ MEMBER_ROLE_PERMISSIONS = {
         'record_payments': False,
         'manage_budgets': False,
         'assign_roles': False,
+        'submit_spending_plan': True,   # Can submit spending plans
+        'submit_budget_increase': True, # Can request budget increases
+        'submit_reimbursement': True,   # Can submit reimbursements
+        'submit_payment_plan': False,
+        'view_all_contacts': True,
     },
     'recruitment_chair': {
-        # Recruitment chair access
+        # Chair access - view own department budget only, submit requests
         'view_all_data': False,
         'view_own_data': True,
-        'view_dues_info': False,  # No individual dues access
-        'view_recruitment_budget': True,
+        'view_dues_info': True,         # Can see own dues only
+        'view_member_finances': False,  # Cannot see other member finances
+        'view_dues_summary': False,     # Cannot see dues summary
+        'view_recruitment_budget': True, # Can see recruitment budget only
         'edit_all_data': False,
         'manage_users': False,
         'send_reminders': False,
@@ -356,6 +407,11 @@ MEMBER_ROLE_PERMISSIONS = {
         'record_payments': False,
         'manage_budgets': False,
         'assign_roles': False,
+        'submit_spending_plan': True,   # Can submit spending plans
+        'submit_budget_increase': True, # Can request budget increases
+        'submit_reimbursement': True,   # Can submit reimbursements
+        'submit_payment_plan': False,
+        'view_all_contacts': True,
     },
     'treasurer': {
         # Treasurer access - same as admin but assigned as member role
@@ -370,6 +426,14 @@ MEMBER_ROLE_PERMISSIONS = {
         'record_payments': True,
         'manage_budgets': True,
         'assign_roles': True,
+        'view_dues_info': True,
+        'view_member_finances': True,
+        'view_dues_summary': True,
+        'submit_spending_plan': True,
+        'submit_budget_increase': True,
+        'submit_reimbursement': True,
+        'submit_payment_plan': True,
+        'view_all_contacts': True,
     }
 }
 
@@ -2925,6 +2989,64 @@ def debug_pending_brothers():
     
     flash(f'Debug complete: {len(treasurer_app.pending_brothers)} pending brothers found. Check console for details.')
     return redirect(url_for('verify_brothers'))
+
+@app.route('/credential_management')
+@require_auth
+@require_permission('manage_users')
+def credential_management():
+    """Credential management page for treasurers to view all brother login details"""
+    print(f"\n🔐 LOADING CREDENTIAL MANAGEMENT")
+    
+    credentials = []
+    total_users = len(treasurer_app.users)
+    brother_accounts = 0
+    linked_accounts = 0
+    
+    # Process each user account
+    for username, user_data in treasurer_app.users.items():
+        if user_data.get('role') == 'brother':
+            brother_accounts += 1
+            
+            # Find associated member
+            member = None
+            member_id = None
+            phone = None
+            
+            for mid, m in treasurer_app.members.items():
+                if hasattr(m, 'user_id') and m.user_id == username:
+                    member = m
+                    member_id = mid
+                    phone = m.contact if hasattr(m, 'contact') else None
+                    linked_accounts += 1
+                    break
+                elif isinstance(m, dict) and m.get('user_id') == username:
+                    member = m
+                    member_id = mid
+                    phone = m.get('contact')
+                    linked_accounts += 1
+                    break
+            
+            # Note: We cannot show actual passwords as they are hashed
+            # This is a security feature - passwords are not recoverable
+            credentials.append({
+                'username': username,
+                'password': '********** (Hashed - Not Recoverable)',
+                'role': user_data.get('role', 'brother'),
+                'created_at': user_data.get('created_at', 'Unknown'),
+                'member_name': member.name if (member and hasattr(member, 'name')) else member.get('name') if member else None,
+                'member_id': member_id,
+                'phone': phone
+            })
+    
+    print(f"   Total users: {total_users}")
+    print(f"   Brother accounts: {brother_accounts}")
+    print(f"   Linked accounts: {linked_accounts}")
+    
+    return render_template('credential_management.html',
+                         credentials=credentials,
+                         total_users=total_users,
+                         brother_accounts=brother_accounts,
+                         linked_accounts=linked_accounts)
 
 @app.route('/verify_brothers', methods=['GET', 'POST'])
 @require_auth
