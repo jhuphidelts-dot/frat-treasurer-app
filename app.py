@@ -2659,6 +2659,25 @@ def verify_brothers():
 @require_permission('assign_roles')
 def role_management():
     """Role management interface for treasurers"""
+    # Force reload member data to ensure fresh data
+    treasurer_app.members = treasurer_app.load_data(treasurer_app.members_file, {})
+    
+    # Log current executive board for debugging
+    executive_roles = ['treasurer', 'president', 'vice_president', 'social_chair', 'phi_ed_chair', 'brotherhood_chair', 'recruitment_chair']
+    print(f"✅ Current Executive Board:")
+    for exec_role in executive_roles:
+        assigned_members = []
+        for member_id, member in treasurer_app.members.items():
+            member_role = member.role if hasattr(member, 'role') else member.get('role', 'brother')
+            if member_role == exec_role:
+                member_name = member.name if hasattr(member, 'name') else member.get('name', 'Unknown')
+                assigned_members.append(member_name)
+        
+        if assigned_members:
+            print(f"  {exec_role}: {', '.join(assigned_members)}")
+        else:
+            print(f"  {exec_role}: VACANT")
+    
     return render_template('role_management.html', members=treasurer_app.members)
 
 @app.route('/assign_role', methods=['POST'])
@@ -2680,19 +2699,70 @@ def assign_role():
     # Check if role is already taken (except for brother role)
     if role != 'brother':
         for existing_id, existing_member in treasurer_app.members.items():
-            if existing_member.role == role and existing_id != member_id:
+            if hasattr(existing_member, 'role') and existing_member.role == role and existing_id != member_id:
                 flash(f'{role.replace("_", " ").title()} position is already filled by {existing_member.name}.', 'warning')
                 return redirect(url_for('role_management'))
     
-    # Update member role
+    # Update member role in JSON system
     member = treasurer_app.members[member_id]
     old_role = member.role if hasattr(member, 'role') and member.role else 'brother'
     member.role = role
     
-    # Save changes
-    treasurer_app.save_data(treasurer_app.members_file, treasurer_app.members)
+    # Also update in SQLAlchemy system if user account exists
+    try:
+        from models import db, User, Role
+        if hasattr(member, 'user_id') and member.user_id:
+            user = User.query.get(member.user_id)
+            if user:
+                # Clear existing roles (except admin which should be preserved)
+                user.roles = [r for r in user.roles if r.name == 'admin']
+                
+                # Add new role
+                if role != 'brother':  # brother is default, no explicit role needed
+                    role_obj = Role.query.filter_by(name=role).first()
+                    if not role_obj:
+                        # Create role if it doesn't exist
+                        role_obj = Role(name=role, description=f'{role.replace("_", " ").title()} role')
+                        db.session.add(role_obj)
+                    user.roles.append(role_obj)
+                
+                # Always ensure brother role exists as base
+                brother_role = Role.query.filter_by(name='brother').first()
+                if not brother_role:
+                    brother_role = Role(name='brother', description='Brother role')
+                    db.session.add(brother_role)
+                if brother_role not in user.roles:
+                    user.roles.append(brother_role)
+                
+                db.session.commit()
+                print(f"Updated SQLAlchemy roles for user {user.full_name}: {[r.name for r in user.roles]}")
+    except Exception as e:
+        print(f"SQLAlchemy role update failed (continuing with JSON): {e}")
+        # Continue with JSON-only update if SQLAlchemy fails
     
-    flash(f'{member.name} has been assigned as {role.replace("_", " ").title()}.', 'success')
+    # Save JSON changes
+    try:
+        treasurer_app.save_data(treasurer_app.members_file, treasurer_app.members)
+        print(f"✅ Successfully saved role assignment: {member.name} -> {role}")
+        print(f"✅ Member data after save: role={member.role}")
+    except Exception as e:
+        print(f"❌ Failed to save member data: {e}")
+        flash(f'Error saving role assignment: {e}', 'error')
+        return redirect(url_for('role_management'))
+    
+    # Verify the assignment was saved
+    updated_members = treasurer_app.load_data(treasurer_app.members_file, {})
+    updated_member = updated_members.get(member_id)
+    if updated_member and hasattr(updated_member, 'role'):
+        print(f"✅ Verification: {updated_member.name} role is now {updated_member.role}")
+        flash(f'{member.name} has been successfully assigned as {role.replace("_", " ").title()}.', 'success')
+    elif updated_member and isinstance(updated_member, dict):
+        print(f"✅ Verification: {updated_member.get('name')} role is now {updated_member.get('role')}")
+        flash(f'{member.name} has been successfully assigned as {role.replace("_", " ").title()}.', 'success')
+    else:
+        print(f"❌ Verification failed: could not confirm role assignment")
+        flash(f'Role assignment may have failed. Please check the Executive Board.', 'warning')
+    
     return redirect(url_for('role_management'))
 
 @app.route('/change_role', methods=['POST'])
@@ -2714,17 +2784,62 @@ def change_role():
     # Check if new role is already taken (except for brother role)
     if new_role != 'brother':
         for existing_id, existing_member in treasurer_app.members.items():
-            if existing_member.role == new_role and existing_id != member_id:
+            if hasattr(existing_member, 'role') and existing_member.role == new_role and existing_id != member_id:
                 flash(f'{new_role.replace("_", " ").title()} position is already filled by {existing_member.name}.', 'warning')
                 return redirect(url_for('role_management'))
     
-    # Update member role
+    # Update member role in JSON system
     member = treasurer_app.members[member_id]
     old_role = member.role if hasattr(member, 'role') and member.role else 'brother'
     member.role = new_role
     
-    # Save changes
-    treasurer_app.save_data(treasurer_app.members_file, treasurer_app.members)
+    # Also update in SQLAlchemy system if user account exists
+    try:
+        from models import db, User, Role
+        if hasattr(member, 'user_id') and member.user_id:
+            user = User.query.get(member.user_id)
+            if user:
+                # Clear existing roles (except admin which should be preserved)
+                user.roles = [r for r in user.roles if r.name == 'admin']
+                
+                # Add new role
+                if new_role != 'brother':  # brother is default, no explicit role needed
+                    role_obj = Role.query.filter_by(name=new_role).first()
+                    if not role_obj:
+                        # Create role if it doesn't exist
+                        role_obj = Role(name=new_role, description=f'{new_role.replace("_", " ").title()} role')
+                        db.session.add(role_obj)
+                    user.roles.append(role_obj)
+                
+                # Always ensure brother role exists as base
+                brother_role = Role.query.filter_by(name='brother').first()
+                if not brother_role:
+                    brother_role = Role(name='brother', description='Brother role')
+                    db.session.add(brother_role)
+                if brother_role not in user.roles:
+                    user.roles.append(brother_role)
+                
+                db.session.commit()
+                print(f"Updated SQLAlchemy roles for user {user.full_name}: {[r.name for r in user.roles]}")
+    except Exception as e:
+        print(f"SQLAlchemy role update failed (continuing with JSON): {e}")
+        # Continue with JSON-only update if SQLAlchemy fails
+    
+    # Save JSON changes
+    try:
+        treasurer_app.save_data(treasurer_app.members_file, treasurer_app.members)
+        print(f"✅ Successfully saved role change: {member.name} {old_role} -> {new_role}")
+    except Exception as e:
+        print(f"❌ Failed to save member data: {e}")
+        flash(f'Error saving role change: {e}', 'error')
+        return redirect(url_for('role_management'))
+    
+    # Verify the change was saved
+    updated_members = treasurer_app.load_data(treasurer_app.members_file, {})
+    updated_member = updated_members.get(member_id)
+    if updated_member:
+        updated_role = updated_member.get('role') if isinstance(updated_member, dict) else getattr(updated_member, 'role', 'brother')
+        print(f"✅ Verification: {member.name} role is now {updated_role}")
     
     if new_role == old_role:
         flash(f'{member.name} role unchanged.', 'info')

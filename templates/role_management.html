@@ -165,6 +165,8 @@
         <div class="row mb-5">
             <div class="col-12">
                 <h3>Current Executive Board</h3>
+                <!-- Debug info: Total members loaded: {{ members.keys() | list | length }} -->
+                <!-- Last updated: {{ moment().format() if moment else 'Unknown' }} -->
                 <div class="row">
                     {% set executive_roles = ['treasurer', 'president', 'vice_president', 'social_chair', 'phi_ed_chair', 'brotherhood_chair', 'recruitment_chair'] %}
                     {% for role in executive_roles %}
