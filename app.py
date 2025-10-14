@@ -148,7 +148,24 @@ def notify_treasurer(message, config, notification_type="Alert"):
     
     # Send SMS to treasurer
     if config.phone:
-        sms_message = f"Treasurer {notification_type}: {message[:100]}..." if len(message) > 100 else f"Treasurer {notification_type}: {message}"
+        # Create SMS-friendly message based on notification type
+        if notification_type == "New Brother Registration":
+            # Extract key info for SMS
+            lines = message.split('\n')
+            name_line = next((line for line in lines if line.startswith('Name:')), '')
+            phone_line = next((line for line in lines if line.startswith('Phone:')), '')
+            
+            if name_line and phone_line:
+                name = name_line.replace('Name: ', '')
+                phone = phone_line.replace('Phone: ', '')
+                sms_message = f"New brother: {name} ({phone}) registered. Check admin panel to verify."
+            else:
+                sms_message = "New brother registration. Check admin panel."
+        else:
+            # For other notification types, use the existing truncation
+            sms_message = f"Treasurer {notification_type}: {message[:100]}..." if len(message) > 100 else f"Treasurer {notification_type}: {message}"
+        
+        print(f"📱 SMS Message ({len(sms_message)} chars): {sms_message}")
         if send_email_to_sms(config.phone, sms_message, config):
             sent = True
     
@@ -256,21 +273,21 @@ MEMBER_ROLE_PERMISSIONS = {
         'assign_roles': False,
     },
     'vice_president': {
-        # VP access - can only view own data and general info, NOT individual dues
-        'view_all_data': False,
-        'view_own_data': True,
-        'view_dues_info': False,  # No individual dues access
-        'view_general_budget': True,  # Can see general budget info
-        'edit_all_data': False,
-        'manage_users': False,
-        'send_reminders': False,
-        'add_transactions': False,
-        'edit_transactions': False,
-        'add_members': False,
-        'edit_members': False,
-        'record_payments': False,
-        'manage_budgets': False,
-        'assign_roles': False,
+        # VP access - STRICTLY READ-ONLY, no management capabilities
+        'view_all_data': False,  # Cannot view all member data
+        'view_own_data': True,   # Can only view own data
+        'view_dues_info': False, # NO individual dues access
+        'view_general_budget': True,  # Can see general budget info only
+        'edit_all_data': False,  # NO editing
+        'manage_users': False,   # NO user management
+        'send_reminders': False, # NO reminder sending
+        'add_transactions': False,  # NO transaction adding
+        'edit_transactions': False, # NO transaction editing
+        'add_members': False,    # NO member adding
+        'edit_members': False,   # NO member editing
+        'record_payments': False, # NO payment recording
+        'manage_budgets': False, # NO budget management
+        'assign_roles': False,   # NO role assignment
     },
     'social_chair': {
         # Social chair - view social budget and expenses only
