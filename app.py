@@ -2450,7 +2450,35 @@ def selective_reminders():
 @app.route('/budget_summary')
 @require_auth
 def budget_summary():
-    return jsonify(treasurer_app.get_budget_summary())
+    if USE_DATABASE:
+        # Database mode - get budget data from DB
+        from models import BudgetLimit, Transaction
+        budget_data = {}
+        
+        # Get budget limits
+        budget_limits = BudgetLimit.query.all()
+        for limit in budget_limits:
+            budget_data[limit.category] = {
+                'limit': limit.amount,
+                'spent': 0.0  # Will calculate below
+            }
+        
+        # Calculate spending per category
+        transactions = Transaction.query.filter_by(type='expense').all()
+        for transaction in transactions:
+            if transaction.category in budget_data:
+                budget_data[transaction.category]['spent'] += transaction.amount
+        
+        # Calculate remaining amounts
+        for category, data in budget_data.items():
+            data['remaining'] = data['limit'] - data['spent']
+        
+        return jsonify(budget_data)
+    elif treasurer_app:
+        # JSON mode
+        return jsonify(treasurer_app.get_budget_summary())
+    else:
+        return jsonify({'error': 'No data available'})
 
 @app.route('/bulk_import', methods=['GET', 'POST'])
 @require_auth

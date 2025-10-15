@@ -1,0 +1,12 @@
+{
+    "name": "Ebubechi Onyia",
+    "email": "eroonyia@gmail.com",
+    "phone": "14808198055",
+    "smtp_username": "eroonyia@gmail.com",
+    "smtp_password": "zecfggrsxzlvnjsp",
+    "twilio_sid": "",
+    "twilio_token": "",
+    "twilio_phone": "",
+    "google_credentials_path": "",
+    "google_sheets_id": ""
+}
