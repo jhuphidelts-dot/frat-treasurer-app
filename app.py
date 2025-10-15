@@ -2208,13 +2208,41 @@ def landing_page():
 @app.route('/dashboard')
 @require_auth
 def dashboard():
-    dues_summary = treasurer_app.get_dues_collection_summary()
+    if USE_DATABASE:
+        # Database mode - get data from SQLAlchemy models
+        from models import Member as MemberModel, Transaction as TransactionModel, Semester
+        
+        # Mock data for now - TODO: implement proper database queries
+        members = {}
+        budget_summary = {}
+        dues_summary = {'total_collected': 0.0, 'total_projected': 0.0, 'outstanding': 0.0, 'collection_rate': 0.0}
+        pending_brothers = {}
+        
+        # Get actual members from database
+        db_members = MemberModel.query.all()
+        for member in db_members:
+            members[str(member.id)] = member
+        
+    else:
+        # JSON mode - use treasurer_app
+        if treasurer_app:
+            dues_summary = treasurer_app.get_dues_collection_summary()
+            members = treasurer_app.members
+            budget_summary = treasurer_app.get_budget_summary()
+            pending_brothers = treasurer_app.pending_brothers
+        else:
+            # Fallback if treasurer_app is None
+            dues_summary = {'total_collected': 0.0, 'total_projected': 0.0, 'outstanding': 0.0, 'collection_rate': 0.0}
+            members = {}
+            budget_summary = {}
+            pending_brothers = {}
+    
     return render_template('index.html', 
-                         members=treasurer_app.members,
-                         budget_summary=treasurer_app.get_budget_summary(),
+                         members=members,
+                         budget_summary=budget_summary,
                          dues_summary=dues_summary,
                          categories=BUDGET_CATEGORIES,
-                         pending_brothers=treasurer_app.pending_brothers)
+                         pending_brothers=pending_brothers)
 
 @app.route('/enhanced')
 @require_auth
@@ -2248,8 +2276,37 @@ def add_transaction():
     amount = float(request.form['amount'])
     transaction_type = request.form['type']
     
-    treasurer_app.add_transaction(category, description, amount, transaction_type)
-    flash('Transaction added successfully!')
+    if USE_DATABASE:
+        # Database mode - create transaction directly
+        from models import Transaction as TransactionModel, Semester
+        current_semester = Semester.query.filter_by(is_current=True).first()
+        
+        transaction = TransactionModel(
+            date=datetime.now().date(),
+            category=category,
+            description=description,
+            amount=amount,
+            type=transaction_type,
+            semester_id=current_semester.id if current_semester else None
+        )
+        
+        try:
+            db.session.add(transaction)
+            db.session.commit()
+            print(f"✅ Transaction saved to database: {description} - ${amount}")
+            flash('Transaction added successfully!')
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ Database transaction failed: {e}")
+            flash(f'Error adding transaction: {e}', 'error')
+    else:
+        # JSON mode - use treasurer_app
+        if treasurer_app:
+            treasurer_app.add_transaction(category, description, amount, transaction_type)
+            flash('Transaction added successfully!')
+        else:
+            flash('Error: Application not properly initialized', 'error')
+    
     return redirect(url_for('dashboard'))
 
 @app.route('/edit_transaction/<transaction_id>', methods=['GET', 'POST'])
@@ -3083,8 +3140,27 @@ def brother_dashboard():
     # Get current user's member info
     member = get_user_member()
     if not member:
-        flash('Member information not found. Please contact the treasurer.', 'error')
-        return redirect(url_for('logout'))
+        # Create a mock member for database mode if no member record exists
+        if USE_DATABASE:
+            from dataclasses import dataclass
+            @dataclass
+            class MockMember:
+                id: str = session.get('user_id', 'unknown')
+                name: str = session.get('user', 'Brother')
+                contact: str = session.get('user', 'N/A')
+                dues_amount: float = 500.0
+                payments_made: list = None
+                contact_type: str = 'email'
+                role: str = get_current_user_role()
+                
+                def __post_init__(self):
+                    if self.payments_made is None:
+                        self.payments_made = []
+            
+            member = MockMember()
+        else:
+            flash('Member information not found. Please contact the treasurer.', 'error')
+            return redirect(url_for('logout'))
     
     # Get summary data based on system type
     if USE_DATABASE:
@@ -3247,18 +3323,35 @@ def verify_brothers():
 @require_permission('assign_roles')
 def role_management():
     """Role management interface for treasurers"""
-    # Force reload member data to ensure fresh data
-    treasurer_app.members = treasurer_app.load_data(treasurer_app.members_file, {})
+    if USE_DATABASE:
+        # Database mode - get members from SQLAlchemy
+        from models import Member as MemberModel
+        db_members = MemberModel.query.all()
+        members = {}
+        for member in db_members:
+            members[str(member.id)] = member
+    elif treasurer_app:
+        # JSON mode - force reload member data to ensure fresh data
+        treasurer_app.members = treasurer_app.load_data(treasurer_app.members_file, {})
+        members = treasurer_app.members
+    else:
+        flash('Application not properly initialized', 'error')
+        return redirect(url_for('dashboard'))
     
     # Log current executive board for debugging
     executive_roles = ['treasurer', 'president', 'vice_president', 'social_chair', 'phi_ed_chair', 'brotherhood_chair', 'recruitment_chair']
     print(f"✅ Current Executive Board:")
     for exec_role in executive_roles:
         assigned_members = []
-        for member_id, member in treasurer_app.members.items():
-            member_role = member.role if hasattr(member, 'role') else member.get('role', 'brother')
-            if member_role == exec_role:
+        for member_id, member in members.items():
+            if USE_DATABASE:
+                member_role = getattr(member, 'role', 'brother')
+                member_name = getattr(member, 'full_name', getattr(member, 'name', 'Unknown'))
+            else:
+                member_role = member.role if hasattr(member, 'role') else member.get('role', 'brother')
                 member_name = member.name if hasattr(member, 'name') else member.get('name', 'Unknown')
+            
+            if member_role == exec_role:
                 assigned_members.append(member_name)
         
         if assigned_members:
@@ -3266,7 +3359,7 @@ def role_management():
         else:
             print(f"  {exec_role}: VACANT")
     
-    return render_template('role_management.html', members=treasurer_app.members)
+    return render_template('role_management.html', members=members)
 
 @app.route('/assign_role', methods=['POST'])
 @require_auth
@@ -3280,8 +3373,66 @@ def assign_role():
         flash('Member and role must be specified.', 'error')
         return redirect(url_for('role_management'))
     
-    if member_id not in treasurer_app.members:
-        flash('Member not found.', 'error')
+    if USE_DATABASE:
+        # Database mode - handle role assignment via SQLAlchemy
+        from models import Member as MemberModel, User, Role
+        
+        member = MemberModel.query.get(member_id)
+        if not member:
+            flash('Member not found.', 'error')
+            return redirect(url_for('role_management'))
+        
+        # Check if role is already taken
+        if role != 'brother':
+            existing_member = MemberModel.query.filter_by(role=role).first()
+            if existing_member and str(existing_member.id) != member_id:
+                flash(f'{role.replace("_", " ").title()} position is already filled by {existing_member.full_name}.', 'warning')
+                return redirect(url_for('role_management'))
+        
+        # Update member role in database
+        old_role = member.role or 'brother'
+        member.role = role
+        
+        # Update user roles if user account exists
+        if member.user:
+            user = member.user
+            # Clear existing roles except admin
+            user.roles = [r for r in user.roles if r.name == 'admin']
+            
+            # Add new role
+            if role != 'brother':
+                role_obj = Role.query.filter_by(name=role).first()
+                if not role_obj:
+                    role_obj = Role(name=role, description=f'{role.replace("_", " ").title()} role')
+                    db.session.add(role_obj)
+                user.roles.append(role_obj)
+            
+            # Ensure brother role
+            brother_role = Role.query.filter_by(name='brother').first()
+            if not brother_role:
+                brother_role = Role(name='brother', description='Brother role')
+                db.session.add(brother_role)
+            if brother_role not in user.roles:
+                user.roles.append(brother_role)
+        
+        try:
+            db.session.commit()
+            flash(f'{member.full_name} has been successfully assigned as {role.replace("_", " ").title()}.', 'success')
+            print(f"✅ Database role assignment: {member.full_name} -> {role}")
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error assigning role: {e}', 'error')
+            print(f"❌ Database role assignment failed: {e}")
+        
+        return redirect(url_for('role_management'))
+    
+    elif treasurer_app:
+        # JSON mode - existing logic
+        if member_id not in treasurer_app.members:
+            flash('Member not found.', 'error')
+            return redirect(url_for('role_management'))
+    else:
+        flash('Application not properly initialized', 'error')
         return redirect(url_for('role_management'))
     
     # Check if role is already taken (except for brother role)
