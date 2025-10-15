@@ -1914,7 +1914,7 @@ class TreasurerApp:
         print(f"🎉 Brother registration completed successfully!\n")
         return pending_id
     
-def verify_brother_with_member(self, pending_id, member_id):
+    def verify_brother_with_member(self, pending_id, member_id):
         """Link a pending brother to an existing member and create user account"""
         if pending_id not in self.pending_brothers:
             return False, "Pending registration not found"
