@@ -48,28 +48,28 @@ def init_database(app):
         from models import User, Role
         treasurer = User.query.join(User.roles).filter(Role.name == 'treasurer').first()
         if not treasurer:
-            print("No treasurer user found, creating default...")
-            # Create a default treasurer (should be changed later)
-            default_treasurer = User(
-                phone="5555555555",
-                first_name="Default",
-                last_name="Treasurer",
-                email="change-me@example.com",
+            print("No treasurer user found, creating Ebubechi Onyia as treasurer...")
+            # Create Ebubechi as the initial treasurer
+            ebubechi = User(
+                phone="4438751825",  # Your phone number
+                first_name="Ebubechi",
+                last_name="Onyia",
+                email="ebubechi@example.com",  # Update with your real email
                 status="active"
             )
-            default_treasurer.set_password("changeme123")
+            ebubechi.set_password("treasurer2024")  # Secure initial password
             
             # Assign treasurer role
             treasurer_role = Role.query.filter_by(name='treasurer').first()
             if treasurer_role:
-                default_treasurer.roles.append(treasurer_role)
+                ebubechi.roles.append(treasurer_role)
             
-            db.session.add(default_treasurer)
+            db.session.add(ebubechi)
             db.session.commit()
-            print("✅ Created default treasurer user")
-            print("⚠️ SECURITY WARNING: Change default treasurer credentials")
-            print("   Phone: 5555555555")
-            print("   Password: changeme123")
+            print("✅ Created Ebubechi Onyia as treasurer")
+            print("📱 Phone: 4438751825")
+            print("🔒 Password: treasurer2024")
+            print("⚠️ Remember to update your email in Treasurer Setup")
         
         print("Database initialized successfully!")
 

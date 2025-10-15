@@ -22,13 +22,13 @@ During deployment, the system will:
 3. Create default roles (admin, treasurer, president, etc.)
 4. Create a default treasurer user if none exists
 
-### 3. Default Treasurer Account
-If no treasurer exists, the system creates:
-- **Phone**: 5555555555
-- **Password**: changeme123
-- **Email**: change-me@example.com
+### 3. Initial Treasurer Account
+If no treasurer exists, the system creates Ebubechi Onyia as treasurer:
+- **Phone**: 4438751825
+- **Password**: treasurer2024
+- **Email**: ebubechi@example.com (update in Treasurer Setup)
 
-**⚠️ SECURITY WARNING**: Change these credentials immediately after first login!
+**⚠️ NOTE**: Update your real email address in "Treasurer Setup" after first login.
 
 ## Manual Database Management
 
@@ -61,7 +61,7 @@ python database.py create-treasurer <phone> <first_name> <last_name> <password>
 **Cause**: No treasurer user created
 
 **Solutions**:
-1. Use default credentials: 5555555555 / changeme123
+1. Use Ebubechi's credentials: 4438751825 / treasurer2024
 2. Or create new user: `python database.py create-treasurer ...`
 
 ### Issue: Database Connection Fails
@@ -115,9 +115,9 @@ If you see:
 
 ### After First Deployment
 1. Visit `/debug/db_status` to verify database mode
-2. Login with: 5555555555 / changeme123
-3. Go to "Treasurer Setup" to change credentials
-4. Add your real email and phone for notifications
+2. Login with: 4438751825 / treasurer2024
+3. Go to "Treasurer Setup" to update your real email
+4. Set up email/SMS notifications if desired
 
 ### For Ongoing Management
 - Use the web interface for all data management
