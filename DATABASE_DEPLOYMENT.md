@@ -23,12 +23,12 @@ During deployment, the system will:
 4. Create a default treasurer user if none exists
 
 ### 3. Initial Treasurer Account
-If no treasurer exists, the system creates Ebubechi Onyia as treasurer:
-- **Phone**: 4438751825
+If no treasurer exists, the system creates Ebubechi Onyia and assigns treasurer role:
+- **Phone**: 4808198055
 - **Password**: treasurer2024
 - **Email**: ebubechi@example.com (update in Treasurer Setup)
 
-**⚠️ NOTE**: Update your real email address in "Treasurer Setup" after first login.
+**💡 NOTE**: The treasurer role can be transferred to other brothers via the admin panel when handover time comes.
 
 ## Manual Database Management
 
@@ -61,7 +61,7 @@ python database.py create-treasurer <phone> <first_name> <last_name> <password>
 **Cause**: No treasurer user created
 
 **Solutions**:
-1. Use Ebubechi's credentials: 4438751825 / treasurer2024
+1. Use Ebubechi's credentials: 4808198055 / treasurer2024
 2. Or create new user: `python database.py create-treasurer ...`
 
 ### Issue: Database Connection Fails
@@ -115,7 +115,7 @@ If you see:
 
 ### After First Deployment
 1. Visit `/debug/db_status` to verify database mode
-2. Login with: 4438751825 / treasurer2024
+2. Login with: 4808198055 / treasurer2024
 3. Go to "Treasurer Setup" to update your real email
 4. Set up email/SMS notifications if desired
 

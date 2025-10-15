@@ -48,10 +48,10 @@ def init_database(app):
         from models import User, Role
         treasurer = User.query.join(User.roles).filter(Role.name == 'treasurer').first()
         if not treasurer:
-            print("No treasurer user found, creating Ebubechi Onyia as treasurer...")
-            # Create Ebubechi as the initial treasurer
+            print("No treasurer user found, creating Ebubechi Onyia with treasurer role...")
+            # Create Ebubechi as a brother and assign treasurer role
             ebubechi = User(
-                phone="4438751825",  # Your phone number
+                phone="4808198055",  # Correct phone number
                 first_name="Ebubechi",
                 last_name="Onyia",
                 email="ebubechi@example.com",  # Update with your real email
@@ -59,17 +59,17 @@ def init_database(app):
             )
             ebubechi.set_password("treasurer2024")  # Secure initial password
             
-            # Assign treasurer role
+            # Assign treasurer role (this brother is currently the treasurer)
             treasurer_role = Role.query.filter_by(name='treasurer').first()
             if treasurer_role:
                 ebubechi.roles.append(treasurer_role)
             
             db.session.add(ebubechi)
             db.session.commit()
-            print("✅ Created Ebubechi Onyia as treasurer")
-            print("📱 Phone: 4438751825")
+            print("✅ Created Ebubechi Onyia and assigned treasurer role")
+            print("📱 Phone: 4808198055")
             print("🔒 Password: treasurer2024")
-            print("⚠️ Remember to update your email in Treasurer Setup")
+            print("💡 Treasurer role can be transferred to other brothers via admin panel")
         
         print("Database initialized successfully!")
 
