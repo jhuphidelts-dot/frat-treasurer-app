@@ -62,11 +62,12 @@ if DATABASE_AVAILABLE and database_url:
         print("🔄 Initializing database tables...")
         with app.app_context():
             try:
-                init_database(app)
-                print("✅ Database tables initialized successfully")
+                # Just create tables, don't run full init on startup to avoid delays
+                db.create_all()
+                print("✅ Database tables ready")
             except Exception as e:
-                print(f"⚠️ Database initialization warning: {e}")
-                # Continue anyway - tables might already exist
+                print(f"⚠️ Database table creation warning: {e}")
+                # Continue anyway - might be a temporary connection issue
         
         USE_DATABASE = True
         print("✅ App initialized with database support")
@@ -4002,6 +4003,18 @@ def debug_db_status():
         'SECRET_KEY_exists': bool(os.environ.get('SECRET_KEY')),
         'PORT': os.environ.get('PORT', 'Not set')
     }
+
+@app.route('/debug/init_db')
+def debug_init_db():
+    """Manually initialize database with default data"""
+    if not USE_DATABASE:
+        return {'error': 'Database mode not active'}
+    
+    try:
+        init_database(app)
+        return {'success': True, 'message': 'Database initialized successfully'}
+    except Exception as e:
+        return {'error': str(e)}
 
 # This app is designed to run exclusively on cloud platforms (Render.com)
 # Local development has been disabled - use the live deployment only
