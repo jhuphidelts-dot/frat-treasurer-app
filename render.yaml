@@ -2,7 +2,7 @@ services:
   - type: web
     name: frat-treasurer-app
     env: python
-    buildCommand: pip install -r requirements.txt && python database.py force-init
+    buildCommand: pip install -r requirements.txt
     startCommand: python app.py
     envVars:
       - key: PYTHON_VERSION
