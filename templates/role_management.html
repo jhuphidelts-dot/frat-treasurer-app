@@ -1,165 +1,84 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Role Management - Fraternity Treasurer</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
-    <style>
-        :root {
-            --bg-color: #ffffff;
-            --bg-secondary: #f8f9fa;
-            --text-color: #212529;
-            --text-muted: #6c757d;
-            --card-bg: #ffffff;
-            --card-header-bg: #f8f9fa;
-            --border-color: #dee2e6;
-            --input-bg: #ffffff;
-            --input-border: #ced4da;
-            --btn-primary-bg: #0d6efd;
-            --shadow: rgba(0,0,0,0.15);
-        }
-        
-        [data-theme="dark"] {
-            --bg-color: #0d1117;
-            --bg-secondary: #161b22;
-            --text-color: #e6edf3;
-            --text-muted: #7d8590;
-            --card-bg: #21262d;
-            --card-header-bg: #2d333b;
-            --border-color: #30363d;
-            --input-bg: #0d1117;
-            --input-border: #30363d;
-            --btn-primary-bg: #238636;
-            --shadow: rgba(0,0,0,0.3);
-        }
-        
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            transition: all 0.3s ease;
-        }
-        
-        .card {
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-            color: var(--text-color);
-            box-shadow: 0 0.125rem 0.25rem var(--shadow);
-        }
-        
-        .card-header {
-            background-color: var(--card-header-bg);
-            border-bottom: 1px solid var(--border-color);
-            color: var(--text-color);
-        }
-        
-        .form-control, .form-select {
-            background-color: var(--input-bg);
-            border: 1px solid var(--input-border);
-            color: var(--text-color);
-        }
-        
-        .form-control:focus, .form-select:focus {
-            background-color: var(--input-bg);
-            border-color: var(--btn-primary-bg);
-            color: var(--text-color);
-            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-        }
-        
-        [data-theme="dark"] .form-control:focus,
-        [data-theme="dark"] .form-select:focus {
-            box-shadow: 0 0 0 0.25rem rgba(35, 134, 54, 0.25);
-        }
-        
-        .table {
-            color: var(--text-color);
-        }
-        
-        .text-muted {
-            color: var(--text-muted) !important;
-        }
-        
-        .modal-content {
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-        }
-        
-        .modal-header {
-            border-bottom: 1px solid var(--border-color);
-        }
-        
-        .modal-footer {
-            border-top: 1px solid var(--border-color);
-        }
-        
-        .navbar-dark {
-            background-color: var(--btn-primary-bg) !important;
-        }
-        
-        .role-card {
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        
-        .role-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        
-        .member-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            color: white;
-            margin-right: 1rem;
-        }
-        
-        .role-badge {
-            font-size: 0.8rem;
-            padding: 0.25rem 0.5rem;
-        }
-    </style>
-</head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container">
-            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
-                <i class="bi bi-bank2"></i> Fraternity Treasurer
-            </a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="{{ url_for('dashboard') }}">
-                    <i class="bi bi-arrow-left"></i> Back to Dashboard
-                </a>
-            </div>
-        </div>
-    </nav>
+{% extends "base.html" %}
 
-    <div class="container mt-4">
-        <div class="row">
-            <div class="col-12">
-                <h1 class="mb-4">
-                    <i class="bi bi-people-fill"></i> Role Management
-                </h1>
-                <p class="lead text-muted">Assign executive positions and roles to fraternity members.</p>
-                
-                <!-- Flash Messages -->
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                            <div class="alert alert-{% if category == 'error' %}danger{% elif category == 'success' %}success{% elif category == 'warning' %}warning{% else %}info{% endif %} alert-dismissible fade show" role="alert">
-                                {{ message }}
-                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
-            </div>
-        </div>
+{% block title %}Role Management - Fraternity Treasurer{% endblock %}
+
+{% block page_title %}
+<i class="bi bi-people-fill"></i> Role Management
+{% endblock %}
+
+{% block extra_styles %}
+.role-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.role-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px var(--shadow);
+}
+
+.member-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: white;
+    margin-right: 1rem;
+}
+
+.role-badge {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* Fix tooltip/hover text visibility */
+.tooltip {
+    font-size: 0.875rem;
+}
+
+.tooltip .tooltip-inner {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 0.5rem 1rem var(--shadow);
+}
+
+.tooltip.bs-tooltip-top .tooltip-arrow::before {
+    border-top-color: var(--border-color);
+}
+
+.tooltip.bs-tooltip-bottom .tooltip-arrow::before {
+    border-bottom-color: var(--border-color);
+}
+
+.tooltip.bs-tooltip-start .tooltip-arrow::before {
+    border-left-color: var(--border-color);
+}
+
+.tooltip.bs-tooltip-end .tooltip-arrow::before {
+    border-right-color: var(--border-color);
+}
+{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <p class="lead text-muted">Assign executive positions and roles to fraternity members.</p>
+        
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{% if category == 'error' %}danger{% elif category == 'success' %}success{% elif category == 'warning' %}warning{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+</div>
 
         <!-- Executive Roles Overview -->
         <div class="row mb-5">
@@ -247,7 +166,10 @@
                                     {% for member_id, member in members.items() %}
                                     <tr>
                                         <td>
-                                            <div class="d-flex align-items-center">
+                                            <div class="d-flex align-items-center" 
+                                                 data-bs-toggle="tooltip" 
+                                                 data-bs-placement="top" 
+                                                 title="{{ member.name }} | {{ member.contact }} | {{ member.contact_type.title() }}">
                                                 <div class="member-avatar bg-secondary me-2" style="width: 32px; height: 32px; font-size: 0.8rem;">
                                                     {{ member.name[0] }}
                                                 </div>
@@ -364,26 +286,26 @@
                 </form>
             </div>
         </div>
-    </div>
+</div>
+{% endblock %}
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Load theme on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-theme', savedTheme);
-        });
+{% block scripts %}
+<script>
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
 
-        function setAssignRole(role, roleName) {
-            document.getElementById('assignRoleValue').value = role;
-            document.getElementById('assignRoleName').textContent = roleName;
-        }
+    function setAssignRole(role, roleName) {
+        document.getElementById('assignRoleValue').value = role;
+        document.getElementById('assignRoleName').textContent = roleName;
+    }
 
-        function setChangeRole(memberId, memberName, currentRole) {
-            document.getElementById('changeMemberId').value = memberId;
-            document.getElementById('changeMemberName').textContent = memberName;
-            document.getElementById('changeRoleSelect').value = currentRole;
-        }
-    </script>
-</body>
-</html>
+    function setChangeRole(memberId, memberName, currentRole) {
+        document.getElementById('changeMemberId').value = memberId;
+        document.getElementById('changeMemberName').textContent = memberName;
+        document.getElementById('changeRoleSelect').value = currentRole;
+    }
+</script>
+{% endblock %}
