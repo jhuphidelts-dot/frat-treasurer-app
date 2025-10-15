@@ -18,11 +18,14 @@ def create_app(config_mode='development'):
             if database_url.startswith('postgres://'):
                 database_url = database_url.replace('postgres://', 'postgresql://', 1)
             app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+            print(f"🔗 Using PostgreSQL: {database_url[:50]}...")
         else:
             app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///fraternity.db'
+            print("🔗 Using SQLite fallback")
     else:
         # SQLite for development
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///fraternity.db'
+        print("🔗 Using SQLite for development")
     
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'change-me-in-production')
@@ -40,6 +43,33 @@ def init_database(app):
         
         # Initialize default roles
         init_default_roles()
+        
+        # Check if there's a treasurer user
+        from models import User, Role
+        treasurer = User.query.join(User.roles).filter(Role.name == 'treasurer').first()
+        if not treasurer:
+            print("No treasurer user found, creating default...")
+            # Create a default treasurer (should be changed later)
+            default_treasurer = User(
+                phone="5555555555",
+                first_name="Default",
+                last_name="Treasurer",
+                email="change-me@example.com",
+                status="active"
+            )
+            default_treasurer.set_password("changeme123")
+            
+            # Assign treasurer role
+            treasurer_role = Role.query.filter_by(name='treasurer').first()
+            if treasurer_role:
+                default_treasurer.roles.append(treasurer_role)
+            
+            db.session.add(default_treasurer)
+            db.session.commit()
+            print("✅ Created default treasurer user")
+            print("⚠️ SECURITY WARNING: Change default treasurer credentials")
+            print("   Phone: 5555555555")
+            print("   Password: changeme123")
         
         print("Database initialized successfully!")
 
@@ -138,8 +168,14 @@ if __name__ == '__main__':
             phone, first_name, last_name, password = sys.argv[2:6]
             create_treasurer_user(phone, first_name, last_name, password)
         
+        elif command == 'force-init':
+            # Force initialize database with production config
+            app = create_app('production')
+            print("🚀 Force initializing database for production...")
+            init_database(app)
+        
         else:
-            print("Available commands: init, status, create-treasurer")
+            print("Available commands: init, status, create-treasurer, force-init")
     
     else:
         print("Usage: python database.py <command>")
@@ -147,3 +183,4 @@ if __name__ == '__main__':
         print("  init              - Initialize database")
         print("  status            - Check database status")  
         print("  create-treasurer  - Create treasurer user")
+        print("  force-init        - Force initialize database for production")

@@ -38,26 +38,44 @@ from executive_views import exec_bp
 load_dotenv()
 
 # Initialize Flask app with database support when available
-if DATABASE_AVAILABLE and os.environ.get('DATABASE_URL'):
+database_url = os.environ.get('DATABASE_URL')
+print(f"🔍 Debug: DATABASE_AVAILABLE={DATABASE_AVAILABLE}, DATABASE_URL exists={bool(database_url)}")
+if database_url:
+    print(f"🔍 Debug: DATABASE_URL prefix={database_url[:30]}...")
+
+if DATABASE_AVAILABLE and database_url:
     print("🔄 Initializing app with database support...")
-    app = create_database_app('production' if os.environ.get('FLASK_ENV') == 'production' else 'development')
-    
-    # Initialize Flask-Login
-    login_manager = LoginManager()
-    login_manager.init_app(app)
-    login_manager.login_view = 'login'
-    login_manager.login_message = 'Please log in to access this page.'
-    
-    @login_manager.user_loader
-    def load_user(user_id):
-        return User.query.get(int(user_id))
-    
-    # Initialize database tables
-    with app.app_context():
-        init_database(app)
-    
-    USE_DATABASE = True
-    print("✅ App initialized with database support")
+    try:
+        app = create_database_app('production' if os.environ.get('FLASK_ENV') == 'production' else 'development')
+        
+        # Initialize Flask-Login
+        login_manager = LoginManager()
+        login_manager.init_app(app)
+        login_manager.login_view = 'login'
+        login_manager.login_message = 'Please log in to access this page.'
+        
+        @login_manager.user_loader
+        def load_user(user_id):
+            return User.query.get(int(user_id))
+        
+        # Initialize database tables
+        print("🔄 Initializing database tables...")
+        with app.app_context():
+            try:
+                init_database(app)
+                print("✅ Database tables initialized successfully")
+            except Exception as e:
+                print(f"⚠️ Database initialization warning: {e}")
+                # Continue anyway - tables might already exist
+        
+        USE_DATABASE = True
+        print("✅ App initialized with database support")
+    except Exception as e:
+        print(f"❌ Failed to initialize database app: {e}")
+        print("🔄 Falling back to JSON mode...")
+        app = Flask(__name__)
+        app.secret_key = os.environ.get("SECRET_KEY", "change-me")
+        USE_DATABASE = False
 else:
     print("🔄 Initializing app with JSON file support...")
     app = Flask(__name__)
@@ -3971,6 +3989,19 @@ def export_chair_budget(chair_type):
         mimetype='text/csv',
         headers={'Content-Disposition': f'attachment; filename={chair_type}_budget_export.csv'}
     )
+
+@app.route('/debug/db_status')
+def debug_db_status():
+    """Debug endpoint to check database configuration status"""
+    return {
+        'USE_DATABASE': USE_DATABASE,
+        'DATABASE_AVAILABLE': DATABASE_AVAILABLE,
+        'DATABASE_URL_exists': bool(os.environ.get('DATABASE_URL')),
+        'DATABASE_URL_prefix': os.environ.get('DATABASE_URL', '')[:20] + '...' if os.environ.get('DATABASE_URL') else 'None',
+        'FLASK_ENV': os.environ.get('FLASK_ENV', 'Not set'),
+        'SECRET_KEY_exists': bool(os.environ.get('SECRET_KEY')),
+        'PORT': os.environ.get('PORT', 'Not set')
+    }
 
 # This app is designed to run exclusively on cloud platforms (Render.com)
 # Local development has been disabled - use the live deployment only
