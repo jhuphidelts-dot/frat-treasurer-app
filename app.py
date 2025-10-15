@@ -19,7 +19,7 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 
 # Database imports
 try:
-    from models import db, User, Role, Member, Transaction, Semester, TreasurerConfig, init_default_roles
+    from models import db, User, Role, Member as DBMember, Transaction as DBTransaction, Semester as DBSemester, TreasurerConfig as DBTreasurerConfig, init_default_roles
     from database import create_app as create_database_app, init_database
     DATABASE_AVAILABLE = True
     print("📊 Database models loaded successfully")
@@ -2210,7 +2210,6 @@ def landing_page():
 def dashboard():
     if USE_DATABASE:
         # Database mode - get data from SQLAlchemy models
-        from models import Member as MemberModel, Transaction as TransactionModel, Semester
         
         # Mock data for now - TODO: implement proper database queries
         members = {}
@@ -2219,7 +2218,7 @@ def dashboard():
         pending_brothers = {}
         
         # Get actual members from database
-        db_members = MemberModel.query.all()
+        db_members = DBMember.query.all()
         for member in db_members:
             members[str(member.id)] = member
         
@@ -2278,10 +2277,9 @@ def add_transaction():
     
     if USE_DATABASE:
         # Database mode - create transaction directly
-        from models import Transaction as TransactionModel, Semester
-        current_semester = Semester.query.filter_by(is_current=True).first()
+        current_semester = DBSemester.query.filter_by(is_current=True).first()
         
-        transaction = TransactionModel(
+        transaction = DBTransaction(
             date=datetime.now().date(),
             category=category,
             description=description,
@@ -3110,7 +3108,7 @@ def brother_dashboard_preview(role_name):
     if role_name in ['president', 'vice_president']:
         if USE_DATABASE:
             # Database mode - get data from SQLAlchemy models
-            total_members = Member.query.count()
+            total_members = DBMember.query.count()
             data.update({
                 'total_members': total_members,
                 'dues_summary': {'total_collected': 5000.0, 'total_projected': 10000.0, 'outstanding': 5000.0, 'collection_rate': 50.0},  # Mock data
@@ -3187,7 +3185,7 @@ def brother_dashboard():
     if has_permission('view_all_data'):
         if USE_DATABASE:
             # Database mode - get data from SQLAlchemy models
-            total_members = Member.query.count()
+            total_members = DBMember.query.count()
             data.update({
                 'total_members': total_members,
                 'dues_summary': {'total_collected': 0.0, 'total_projected': 0.0, 'outstanding': 0.0, 'collection_rate': 0.0},  # TODO: Implement for database mode
@@ -3231,45 +3229,63 @@ def credential_management():
     print(f"\n🔐 LOADING CREDENTIAL MANAGEMENT")
     
     credentials = []
-    total_users = len(treasurer_app.users)
     brother_accounts = 0
     linked_accounts = 0
     
-    # Process each user account
-    for username, user_data in treasurer_app.users.items():
-        if user_data.get('role') == 'brother':
-            brother_accounts += 1
-            
-            # Find associated member
-            member = None
-            member_id = None
-            phone = None
-            
-            for mid, m in treasurer_app.members.items():
-                if hasattr(m, 'user_id') and m.user_id == username:
-                    member = m
-                    member_id = mid
-                    phone = m.contact if hasattr(m, 'contact') else None
+    if USE_DATABASE:
+        users = User.query.all()
+        total_users = len(users)
+        for user in users:
+            is_brother = any(r.name == 'brother' for r in user.roles) or (user.get_primary_role() and user.get_primary_role().name == 'brother')
+            if is_brother:
+                brother_accounts += 1
+                member = getattr(user, 'member_record', None)
+                credentials.append({
+                    'username': user.phone or user.email,
+                    'password': '********** (Hashed - Not Recoverable)',
+                    'role': user.get_primary_role().name if user.get_primary_role() else 'brother',
+                    'created_at': getattr(user, 'created_at', 'Unknown'),
+                    'member_name': getattr(member, 'full_name', getattr(member, 'name', None)) if member else None,
+                    'member_id': getattr(member, 'id', None) if member else None,
+                    'phone': user.phone
+                })
+                if member:
                     linked_accounts += 1
-                    break
-                elif isinstance(m, dict) and m.get('user_id') == username:
-                    member = m
-                    member_id = mid
-                    phone = m.get('contact')
-                    linked_accounts += 1
-                    break
-            
-            # Note: We cannot show actual passwords as they are hashed
-            # This is a security feature - passwords are not recoverable
-            credentials.append({
-                'username': username,
-                'password': '********** (Hashed - Not Recoverable)',
-                'role': user_data.get('role', 'brother'),
-                'created_at': user_data.get('created_at', 'Unknown'),
-                'member_name': member.name if (member and hasattr(member, 'name')) else member.get('name') if member else None,
-                'member_id': member_id,
-                'phone': phone
-            })
+    elif treasurer_app:
+        total_users = len(treasurer_app.users)
+        # Process each user account (JSON mode)
+        for username, user_data in treasurer_app.users.items():
+            if user_data.get('role') == 'brother':
+                brother_accounts += 1
+                # Find associated member
+                member = None
+                member_id = None
+                phone = None
+                for mid, m in treasurer_app.members.items():
+                    if hasattr(m, 'user_id') and m.user_id == username:
+                        member = m
+                        member_id = mid
+                        phone = m.contact if hasattr(m, 'contact') else None
+                        linked_accounts += 1
+                        break
+                    elif isinstance(m, dict) and m.get('user_id') == username:
+                        member = m
+                        member_id = mid
+                        phone = m.get('contact')
+                        linked_accounts += 1
+                        break
+                credentials.append({
+                    'username': username,
+                    'password': '********** (Hashed - Not Recoverable)',
+                    'role': user_data.get('role', 'brother'),
+                    'created_at': user_data.get('created_at', 'Unknown'),
+                    'member_name': member.name if (member and hasattr(member, 'name')) else member.get('name') if member else None,
+                    'member_id': member_id,
+                    'phone': phone
+                })
+    else:
+        flash('Application not properly initialized', 'error')
+        return redirect(url_for('dashboard'))
     
     print(f"   Total users: {total_users}")
     print(f"   Brother accounts: {brother_accounts}")
@@ -3285,7 +3301,10 @@ def credential_management():
 @require_auth
 @require_permission('manage_users')
 def verify_brothers():
-    """Treasurer interface to verify pending brother registrations"""
+    """Treasurer interface to verify pending brother registrations (JSON mode only)"""
+    if USE_DATABASE or not treasurer_app:
+        flash('Pending brother verification is managed via the database user admin in this deployment.', 'info')
+        return redirect(url_for('dashboard'))
     if request.method == 'GET':
         # Force reload pending brothers from disk
         treasurer_app.pending_brothers = treasurer_app.load_data(treasurer_app.pending_brothers_file, {})

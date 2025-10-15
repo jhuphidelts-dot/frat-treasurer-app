@@ -258,6 +258,10 @@
                                 <li><hr class="dropdown-divider"></li>
                             {% endif %}
                             
+                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#whatsNewModal">
+                                <i class="bi bi-stars"></i> What's New
+                            </a></li>
+                            
                             <li><a class="dropdown-item" href="{{ url_for('change_password') }}">
                                 <i class="bi bi-key"></i> Change Password
                             </a></li>
@@ -341,6 +345,68 @@
         // Initialize theme on page load
         document.addEventListener('DOMContentLoaded', initTheme);
     </script>
+    
+    <!-- What's New Modal -->
+    <div class="modal fade" id="whatsNewModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-stars"></i> Key Features Implemented</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <h6>1. Tab Navigation</h6>
+              <ul>
+                <li>Social Chair</li>
+                <li>Phi Ed Chair</li>
+                <li>Brotherhood Chair</li>
+                <li>Recruitment Chair</li>
+              </ul>
+            </div>
+            <div class="mb-3">
+              <h6>2. Role-Based Access Control</h6>
+              <ul>
+                <li>Treasurer/Admin/President/VP: Can see ALL chair budget tabs</li>
+                <li>Individual Chairs: Can ONLY see their own budget tab (auto-redirected)</li>
+                <li>Brothers: No access to chair budgets</li>
+              </ul>
+            </div>
+            <div class="mb-3">
+              <h6>3. Budget Information Display (per chair)</h6>
+              <ul>
+                <li>Budget Allocation, Total Spent, Pending Requests, Remaining</li>
+                <li>Usage Progress Bar</li>
+              </ul>
+            </div>
+            <div class="mb-3">
+              <h6>4. Data Sections (per chair tab)</h6>
+              <ul>
+                <li>Spending Plans with approval status</li>
+                <li>Pending Reimbursements</li>
+                <li>Recent Expenses</li>
+              </ul>
+            </div>
+            <div class="mb-3">
+              <h6>5. Interactive Features</h6>
+              <ul>
+                <li>Budget Adjustment (for treasurers/admins)</li>
+                <li>Quick Actions (create plans, request reimbursements)</li>
+                <li>Data Export (CSV)</li>
+                <li>Auto-redirect to own tab (for chairs)</li>
+              </ul>
+            </div>
+            <div class="mb-0">
+              <h6>6. Navigation Integration</h6>
+              <p>Added "Chair Budgets" link in main navigation (visible to relevant users)</p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
     
     {% block extra_js %}{% endblock %}
 </body>
