@@ -15,6 +15,17 @@ import hashlib
 import re
 import calendar
 import time
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+
+# Database imports
+try:
+    from models import db, User, Role, Member, Transaction, Semester, TreasurerConfig, init_default_roles
+    from database import create_app as create_database_app, init_database
+    DATABASE_AVAILABLE = True
+    print("📊 Database models loaded successfully")
+except ImportError as e:
+    print(f"⚠️ Database models not available: {e}")
+    DATABASE_AVAILABLE = False
 
 # Import Flask blueprints
 # from notifications import notifications_bp  # Commented out due to compatibility issues
@@ -26,8 +37,33 @@ from executive_views import exec_bp
 # Load environment variables
 load_dotenv()
 
-app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "change-me")  # needed for flash()
+# Initialize Flask app with database support when available
+if DATABASE_AVAILABLE and os.environ.get('DATABASE_URL'):
+    print("🔄 Initializing app with database support...")
+    app = create_database_app('production' if os.environ.get('FLASK_ENV') == 'production' else 'development')
+    
+    # Initialize Flask-Login
+    login_manager = LoginManager()
+    login_manager.init_app(app)
+    login_manager.login_view = 'login'
+    login_manager.login_message = 'Please log in to access this page.'
+    
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.query.get(int(user_id))
+    
+    # Initialize database tables
+    with app.app_context():
+        init_database(app)
+    
+    USE_DATABASE = True
+    print("✅ App initialized with database support")
+else:
+    print("🔄 Initializing app with JSON file support...")
+    app = Flask(__name__)
+    app.secret_key = os.environ.get("SECRET_KEY", "change-me")  # needed for flash()
+    USE_DATABASE = False
+    print("✅ App initialized with JSON file support")
 
 # Register blueprints
 # app.register_blueprint(notifications_bp)  # Commented out due to compatibility issues
@@ -453,12 +489,21 @@ def get_current_user_role():
     if session.get('user') == 'admin' or session.get('role') == 'admin':
         return 'admin'
     
-    # For brother accounts, get role from linked member
-    user_id = session.get('user')
-    if user_id:
-        member = treasurer_app.get_member_by_user_id(user_id)
-        if member and hasattr(member, 'role'):
-            return member.role
+    if USE_DATABASE:
+        # Database mode - get role from SQLAlchemy User model
+        user_id = session.get('user_id')
+        if user_id:
+            user = User.query.get(user_id)
+            if user:
+                primary_role = user.get_primary_role()
+                return primary_role.name if primary_role else 'brother'
+    else:
+        # JSON mode - get role from linked member
+        user_id = session.get('user')
+        if user_id and treasurer_app:
+            member = treasurer_app.get_member_by_user_id(user_id)
+            if member and hasattr(member, 'role'):
+                return member.role
     
     # Fallback to session role or default
     return session.get('role', 'brother')
@@ -476,9 +521,16 @@ def has_permission(permission_name):
 
 def get_user_member():
     """Get the member object for the current user"""
-    user_id = session.get('user')
-    if user_id:
-        return treasurer_app.get_member_by_user_id(user_id)
+    if USE_DATABASE:
+        user_id = session.get('user_id')
+        if user_id:
+            user = User.query.get(user_id)
+            if user and user.member_record:
+                return user.member_record
+    else:
+        user_id = session.get('user')
+        if user_id and treasurer_app:
+            return treasurer_app.get_member_by_user_id(user_id)
     return None
 
 def require_permission(permission_name):
@@ -1862,7 +1914,7 @@ class TreasurerApp:
         print(f"🎉 Brother registration completed successfully!\n")
         return pending_id
     
-    def verify_brother_with_member(self, pending_id, member_id):
+def verify_brother_with_member(self, pending_id, member_id):
         """Link a pending brother to an existing member and create user account"""
         if pending_id not in self.pending_brothers:
             return False, "Pending registration not found"
@@ -1873,16 +1925,49 @@ class TreasurerApp:
         pending_brother = self.pending_brothers[pending_id]
         member = self.members[member_id]
         
-        # Create user account for the brother
-        username = pending_brother.email.lower()
-        
         # Generate secure random password
         import secrets
         import string
         alphabet = string.ascii_letters + string.digits
         secure_password = ''.join(secrets.choice(alphabet) for _ in range(12))
         
-        if self.create_user(username, secure_password, 'brother'):
+        # Create user account based on available system
+        username = None
+        user_created = False
+        
+        if USE_DATABASE:
+            try:
+                # Create user in database
+                user = User(
+                    phone=pending_brother.phone,
+                    first_name=pending_brother.full_name.split()[0] if pending_brother.full_name else 'Brother',
+                    last_name=' '.join(pending_brother.full_name.split()[1:]) if len(pending_brother.full_name.split()) > 1 else '',
+                    email=pending_brother.email.lower(),
+                    status='active'
+                )
+                user.set_password(secure_password)
+                
+                # Assign brother role
+                brother_role = Role.query.filter_by(name='brother').first()
+                if brother_role:
+                    user.roles.append(brother_role)
+                
+                db.session.add(user)
+                db.session.commit()
+                
+                username = pending_brother.phone  # Use phone as login
+                user_created = True
+                print(f"✅ Created database user account for {pending_brother.full_name}")
+            except Exception as e:
+                print(f"❌ Database user creation failed: {e}")
+                db.session.rollback()
+        
+        if not user_created:
+            # Fallback to JSON user creation
+            username = pending_brother.email.lower()
+            user_created = self.create_user(username, secure_password, 'brother')
+        
+        if user_created:
             # Link member to user account
             member.user_id = username
             
@@ -1989,8 +2074,13 @@ class TreasurerApp:
                 print(f"Google Sheets sync failed: {e}")
             return False
 
-# Initialize the app
-treasurer_app = TreasurerApp()
+# Initialize the appropriate data layer
+if USE_DATABASE:
+    print("📊 Using database for data storage")
+    treasurer_app = None  # Will use database models directly
+else:
+    print("📄 Using JSON files for data storage")
+    treasurer_app = TreasurerApp()
 
 # Authentication decorator
 def require_auth(f):
@@ -2010,6 +2100,24 @@ def inject_permission_functions():
         'get_current_user_role': get_current_user_role
     }
 
+def authenticate_user_dual(username, password):
+    """Authenticate user using either database or JSON system"""
+    if USE_DATABASE:
+        # Database authentication
+        user = User.query.filter_by(phone=username).first()
+        if not user:
+            user = User.query.filter_by(email=username).first()
+        
+        if user and user.check_password(password):
+            return user, user.get_primary_role().name if user.get_primary_role() else 'brother'
+        return None, None
+    else:
+        # JSON authentication
+        if treasurer_app and treasurer_app.authenticate_user(username, password):
+            role = treasurer_app.users[username]['role']
+            return username, role
+        return None, None
+
 # Flask routes
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -2019,13 +2127,24 @@ def login():
     username = request.form['username']
     password = request.form['password']
     
-    if treasurer_app.authenticate_user(username, password):
-        session['user'] = username
-        session['role'] = treasurer_app.users[username]['role']
-        flash(f'Welcome, {username}!')
+    user, role = authenticate_user_dual(username, password)
+    
+    if user:
+        if USE_DATABASE:
+            # Database login
+            login_user(user, remember=True)
+            session['user'] = user.phone
+            session['role'] = role
+            session['user_id'] = user.id
+            flash(f'Welcome, {user.first_name}!')
+        else:
+            # JSON login
+            session['user'] = username
+            session['role'] = role
+            flash(f'Welcome, {username}!')
         
         # Redirect based on user type
-        if treasurer_app.users[username]['role'] == 'brother':
+        if role == 'brother':
             return redirect(url_for('brother_dashboard'))
         else:
             return redirect(url_for('dashboard'))
@@ -2664,16 +2783,17 @@ def semester_management():
 @app.route('/preview_role/<role_name>')
 @require_auth
 def preview_role(role_name):
-    """Preview dashboard as different role (treasurer only)"""
-    # Check if user is treasurer/admin
-    if session.get('user') != 'admin':  # Only admin can preview roles
-        flash('Only treasurers can preview other roles.')
+    """Preview dashboard as different role (admin only)"""
+    # Check if user is admin - strict check for admin access only
+    current_role = get_current_user_role()
+    if current_role != 'admin' and session.get('user') != 'admin':
+        flash('Only admin can preview other roles.', 'error')
         return redirect(url_for('dashboard'))
     
-    # Valid roles for preview
+    # Valid roles for preview (updated to use generic 'chair' terminology)
     valid_roles = ['president', 'vice_president', 'social_chair', 'phi_ed_chair', 'recruitment_chair', 'brotherhood_chair', 'brother']
     if role_name not in valid_roles:
-        flash('Invalid role for preview.')
+        flash('Invalid role for preview.', 'error')
         return redirect(url_for('dashboard'))
     
     # Store current role in session for restoration
@@ -2681,7 +2801,12 @@ def preview_role(role_name):
     session['preview_role'] = role_name
     session['original_role'] = 'admin'
     
-    flash(f'Now previewing dashboard as: {role_name.replace("_", " ").title()}. Click "Exit Preview" to return to treasurer view.', 'info')
+    # Create user-friendly role name
+    role_display = role_name.replace('_', ' ').title()
+    if 'chair' in role_name.lower():
+        role_display = role_display.replace('Chair', 'Chair')  # Keep Chair capitalization
+    
+    flash(f'Now previewing dashboard as: {role_display}. Click "Exit Preview" to return to admin view.', 'info')
     
     # Redirect based on role type
     if role_name in ['president', 'vice_president']:
@@ -2885,7 +3010,8 @@ def brother_registration():
 @require_auth
 def brother_dashboard_preview(role_name):
     """Preview brother dashboard as specific role (admin only)"""
-    if session.get('user') != 'admin' or not session.get('preview_mode'):
+    current_role = get_current_user_role()
+    if (current_role != 'admin' and session.get('user') != 'admin') or not session.get('preview_mode'):
         return redirect(url_for('brother_dashboard'))
     
     # Create a mock member for preview
@@ -2923,17 +3049,30 @@ def brother_dashboard_preview(role_name):
         'payment_schedule': payment_schedule
     }
     
-    # Add additional data for executives
+    # Add additional data for executives (handle both database and JSON modes)
     if role_name in ['president', 'vice_president']:
-        data.update({
-            'total_members': len(treasurer_app.members),
-            'dues_summary': treasurer_app.get_dues_collection_summary(),
-            'budget_summary': treasurer_app.get_budget_summary()
-        })
+        if USE_DATABASE:
+            # Database mode - get data from SQLAlchemy models
+            total_members = Member.query.count()
+            data.update({
+                'total_members': total_members,
+                'dues_summary': {'total_collected': 5000.0, 'total_projected': 10000.0, 'outstanding': 5000.0, 'collection_rate': 50.0},  # Mock data
+                'budget_summary': {}  # Mock budget data
+            })
+        elif treasurer_app:
+            # JSON mode - get data from TreasurerApp
+            data.update({
+                'total_members': len(treasurer_app.members),
+                'dues_summary': treasurer_app.get_dues_collection_summary(),
+                'budget_summary': treasurer_app.get_budget_summary()
+            })
     elif role_name in ['social_chair', 'phi_ed_chair', 'brotherhood_chair', 'recruitment_chair']:
-        data.update({
-            'budget_summary': treasurer_app.get_budget_summary()
-        })
+        if USE_DATABASE:
+            # Database mode - mock budget data for preview
+            data.update({'budget_summary': {}})
+        elif treasurer_app:
+            # JSON mode - get actual budget data
+            data.update({'budget_summary': treasurer_app.get_budget_summary()})
     
     return render_template('brother_dashboard.html', **data)
 
@@ -2947,26 +3086,44 @@ def brother_dashboard():
         flash('Member information not found. Please contact the treasurer.', 'error')
         return redirect(url_for('logout'))
     
-    # Calculate member's balance
-    balance = treasurer_app.get_member_balance(member.id)
+    # Get summary data based on system type
+    if USE_DATABASE:
+        # Database mode - use SQLAlchemy models
+        balance = member.get_balance() if hasattr(member, 'get_balance') else 0.0
+        payment_schedule = []  # TODO: Implement payment schedule for database mode
+    elif treasurer_app:
+        # JSON mode - use TreasurerApp methods
+        balance = treasurer_app.get_member_balance(member.id)
+        payment_schedule = treasurer_app.get_member_payment_schedule(member.id)
+    else:
+        # Fallback
+        balance = 0.0
+        payment_schedule = []
     
-    # Get payment schedule
-    payment_schedule = treasurer_app.get_member_payment_schedule(member.id)
-    
-    # Get summary data based on permissions
+    # Basic data for all users
     data = {
         'member': member,
         'balance': balance,
         'payment_schedule': payment_schedule
     }
     
-    # Add additional data for executives
+    # Add additional data for executives based on permissions
     if has_permission('view_all_data'):
-        data.update({
-            'total_members': len(treasurer_app.members),
-            'dues_summary': treasurer_app.get_dues_collection_summary(),
-            'budget_summary': treasurer_app.get_budget_summary()
-        })
+        if USE_DATABASE:
+            # Database mode - get data from SQLAlchemy models
+            total_members = Member.query.count()
+            data.update({
+                'total_members': total_members,
+                'dues_summary': {'total_collected': 0.0, 'total_projected': 0.0, 'outstanding': 0.0, 'collection_rate': 0.0},  # TODO: Implement for database mode
+                'budget_summary': {}  # TODO: Implement for database mode
+            })
+        elif treasurer_app:
+            # JSON mode - get data from TreasurerApp
+            data.update({
+                'total_members': len(treasurer_app.members),
+                'dues_summary': treasurer_app.get_dues_collection_summary(),
+                'budget_summary': treasurer_app.get_budget_summary()
+            })
     
     return render_template('brother_dashboard.html', **data)
 
@@ -3329,6 +3486,283 @@ def get_ai_response(message):
     
     # Default response
     return "💡 **Common Questions:**\n• 'Email not working' - Email troubleshooting\n• 'How to add members' - Member management help\n• 'Setup help' - Configuration guidance\n• 'SMS issues' - Text message problems\n• 'Export data' - Backup and export help\n\n**Tip:** Be specific about your issue for better help!"
+
+@app.route('/chair_budget_management')
+@require_auth
+def chair_budget_management():
+    """Chair budget management page with tab navigation"""
+    current_user_role = get_current_user_role()
+    
+    # Define chair categories
+    chair_categories = {
+        'social': 'Social Chair',
+        'phi_ed': 'Phi Ed Chair', 
+        'brotherhood': 'Brotherhood Chair',
+        'recruitment': 'Recruitment Chair'
+    }
+    
+    # Check user permissions
+    can_view_all_budgets = has_permission('manage_budgets') or current_user_role in ['admin', 'treasurer', 'president', 'vice_president']
+    
+    # Determine user's chair type if they're a chair
+    user_chair_type = None
+    if current_user_role.endswith('_chair'):
+        user_chair_type = current_user_role.replace('_chair', '')
+    
+    # Build chair budget data
+    chair_budgets = {}
+    
+    for chair_type, display_name in chair_categories.items():
+        # Determine if user can access this chair's budget
+        accessible = can_view_all_budgets or (user_chair_type == chair_type)
+        
+        if accessible:
+            # Get budget data for this chair category
+            if USE_DATABASE:
+                # Database mode - get data from SQLAlchemy models
+                budget_data = get_chair_budget_data_db(chair_type)
+            elif treasurer_app:
+                # JSON mode - get data from TreasurerApp
+                budget_data = get_chair_budget_data_json(chair_type)
+            else:
+                # Fallback data
+                budget_data = get_mock_chair_budget_data(chair_type)
+            
+            chair_budgets[chair_type] = {
+                'display_name': display_name,
+                'accessible': True,
+                'is_own_budget': (user_chair_type == chair_type),
+                **budget_data
+            }
+        else:
+            chair_budgets[chair_type] = {
+                'display_name': display_name,
+                'accessible': False,
+                'is_own_budget': False
+            }
+    
+    return render_template('chair_budget_management.html',
+                         chair_budgets=chair_budgets,
+                         can_view_all_budgets=can_view_all_budgets,
+                         user_chair_type=user_chair_type,
+                         restricted_access=(not can_view_all_budgets and user_chair_type))
+
+def get_chair_budget_data_db(chair_type):
+    """Get chair budget data from database"""
+    # TODO: Implement database queries for chair budget data
+    return get_mock_chair_budget_data(chair_type)
+
+def get_chair_budget_data_json(chair_type):
+    """Get chair budget data from JSON files"""
+    if not treasurer_app:
+        return get_mock_chair_budget_data(chair_type)
+    
+    # Map chair types to budget categories
+    category_mapping = {
+        'social': 'Social',
+        'phi_ed': 'Phi ED',
+        'brotherhood': 'Brotherhood', 
+        'recruitment': 'Recruitment'
+    }
+    
+    category = category_mapping.get(chair_type, chair_type.title())
+    
+    # Get budget limit
+    budget_limit = treasurer_app.budget_limits.get(category, 0.0)
+    
+    # Get expenses for this category
+    expenses = []
+    total_spent = 0.0
+    
+    for transaction in treasurer_app.transactions:
+        if hasattr(transaction, 'category') and transaction.category == category:
+            if transaction.type == 'expense':
+                expenses.append({
+                    'date': transaction.date,
+                    'description': transaction.description,
+                    'category': transaction.category,
+                    'amount': transaction.amount,
+                    'status': 'completed',
+                    'notes': ''
+                })
+                total_spent += transaction.amount
+    
+    # Calculate remaining budget
+    remaining = budget_limit - total_spent
+    usage_percentage = (total_spent / budget_limit * 100) if budget_limit > 0 else 0
+    
+    return {
+        'budget_limit': budget_limit,
+        'total_spent': total_spent,
+        'pending_amount': 0.0,  # TODO: Get from pending reimbursements
+        'remaining': remaining,
+        'usage_percentage': min(usage_percentage, 100),
+        'expenses_count': len(expenses),
+        'spending_plans': [],  # TODO: Get from spending plans
+        'pending_reimbursements': [],  # TODO: Get from reimbursement requests
+        'recent_expenses': expenses[:10]  # Show last 10 expenses
+    }
+
+def get_mock_chair_budget_data(chair_type):
+    """Get mock chair budget data for demo/fallback"""
+    import random
+    
+    # Mock budget allocations
+    budget_limits = {
+        'social': 2500.0,
+        'phi_ed': 1500.0,
+        'brotherhood': 2000.0,
+        'recruitment': 3000.0
+    }
+    
+    budget_limit = budget_limits.get(chair_type, 1000.0)
+    total_spent = random.uniform(budget_limit * 0.3, budget_limit * 0.8)
+    pending_amount = random.uniform(0, budget_limit * 0.2)
+    remaining = budget_limit - total_spent - pending_amount
+    usage_percentage = (total_spent / budget_limit * 100) if budget_limit > 0 else 0
+    
+    # Mock expenses
+    mock_expenses = [
+        {
+            'date': '2024-10-14',
+            'description': f'{chair_type.title()} event supplies',
+            'category': chair_type.title(),
+            'amount': 150.00,
+            'status': 'completed',
+            'notes': 'Pizza for brotherhood event'
+        },
+        {
+            'date': '2024-10-10', 
+            'description': f'{chair_type.title()} venue rental',
+            'category': chair_type.title(),
+            'amount': 300.00,
+            'status': 'completed',
+            'notes': ''
+        }
+    ]
+    
+    # Mock spending plans
+    mock_plans = [
+        {
+            'title': f'{chair_type.title()} Semester Plan',
+            'description': f'Budget plan for {chair_type} activities this semester',
+            'amount': budget_limit * 0.8,
+            'status': 'approved',
+            'created_date': '2024-09-01',
+            'creator': f'{chair_type.title()} Chair'
+        }
+    ]
+    
+    # Mock reimbursements
+    mock_reimbursements = [
+        {
+            'purpose': f'{chair_type.title()} supplies',
+            'amount': 75.00,
+            'submitted_date': '2024-10-12',
+            'submitter': f'{chair_type.title()} Chair',
+            'receipt': True
+        }
+    ] if random.random() > 0.5 else []
+    
+    return {
+        'budget_limit': budget_limit,
+        'total_spent': total_spent,
+        'pending_amount': pending_amount,
+        'remaining': remaining,
+        'usage_percentage': min(usage_percentage, 100),
+        'expenses_count': len(mock_expenses),
+        'spending_plans': mock_plans,
+        'pending_reimbursements': mock_reimbursements,
+        'recent_expenses': mock_expenses
+    }
+
+@app.route('/chair_budget_management/adjust_budget', methods=['POST'])
+@require_auth
+@require_permission('manage_budgets')
+def adjust_chair_budget():
+    """Adjust budget allocation for a chair category"""
+    data = request.get_json()
+    chair_type = data.get('chair_type')
+    amount = data.get('amount')
+    
+    if not chair_type or amount is None:
+        return jsonify({'success': False, 'error': 'Missing chair_type or amount'})
+    
+    try:
+        # Map chair types to budget categories
+        category_mapping = {
+            'social': 'Social',
+            'phi_ed': 'Phi ED',
+            'brotherhood': 'Brotherhood',
+            'recruitment': 'Recruitment'
+        }
+        
+        category = category_mapping.get(chair_type)
+        if not category:
+            return jsonify({'success': False, 'error': 'Invalid chair type'})
+        
+        if USE_DATABASE:
+            # Update budget in database
+            # TODO: Implement database budget update
+            pass
+        elif treasurer_app:
+            # Update budget in JSON
+            treasurer_app.budget_limits[category] = float(amount)
+            treasurer_app.save_data(treasurer_app.budget_file, treasurer_app.budget_limits)
+        
+        return jsonify({'success': True, 'message': f'Budget updated for {category}'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/chair_budget_management/export/<chair_type>')
+@require_auth
+def export_chair_budget(chair_type):
+    """Export chair budget data as CSV"""
+    current_user_role = get_current_user_role()
+    user_chair_type = current_user_role.replace('_chair', '') if current_user_role.endswith('_chair') else None
+    
+    # Check permissions
+    can_view_all = has_permission('manage_budgets') or current_user_role in ['admin', 'treasurer', 'president', 'vice_president']
+    if not can_view_all and user_chair_type != chair_type:
+        flash('Access denied', 'error')
+        return redirect(url_for('chair_budget_management'))
+    
+    # Get chair budget data
+    if USE_DATABASE:
+        budget_data = get_chair_budget_data_db(chair_type)
+    elif treasurer_app:
+        budget_data = get_chair_budget_data_json(chair_type)
+    else:
+        budget_data = get_mock_chair_budget_data(chair_type)
+    
+    # Create CSV content
+    import io
+    import csv
+    from flask import Response
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write budget overview
+    writer.writerow([f'{chair_type.title()} Chair Budget Export'])
+    writer.writerow(['Budget Allocation', f"${budget_data['budget_limit']:.2f}"])
+    writer.writerow(['Total Spent', f"${budget_data['total_spent']:.2f}"])
+    writer.writerow(['Remaining', f"${budget_data['remaining']:.2f}"])
+    writer.writerow([])
+    
+    # Write expenses
+    writer.writerow(['Recent Expenses'])
+    writer.writerow(['Date', 'Description', 'Amount', 'Status'])
+    for expense in budget_data['recent_expenses']:
+        writer.writerow([expense['date'], expense['description'], f"${expense['amount']:.2f}", expense['status']])
+    
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename={chair_type}_budget_export.csv'}
+    )
 
 # This app is designed to run exclusively on cloud platforms (Render.com)
 # Local development has been disabled - use the live deployment only

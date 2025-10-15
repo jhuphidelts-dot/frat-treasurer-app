@@ -31,13 +31,18 @@ def load_json_data(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-def create_app():
+def create_migration_app():
     """Create Flask app for migration"""
     app = Flask(__name__)
     
-    # Database configuration
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///fraternity.db'
+    # Database configuration - use environment variable or default to SQLite
+    database_url = os.environ.get('DATABASE_URL', 'sqlite:///fraternity.db')
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'migration-key')
     
     db.init_app(app)
     return app
@@ -246,6 +251,24 @@ def migrate_treasurer_config(data_dir):
         treasurer_config = TreasurerConfig()
         db.session.add(treasurer_config)
 
+def migrate_pending_brothers(data_dir):
+    """Migrate pending brothers data"""
+    print("👥 Migrating pending brothers...")
+    
+    pending_file = os.path.join(data_dir, 'pending_brothers.json')
+    pending_data = load_json_data(pending_file)
+    
+    if not pending_data:
+        print("   No pending brothers data found")
+        return
+    
+    # Note: Pending brothers would be stored in a separate table in a full implementation
+    # For now, we'll just log them as they represent temporary data
+    for pending_id, pending_info in pending_data.items():
+        print(f"   Found pending brother: {pending_info.get('full_name', 'Unknown')} - {pending_info.get('phone', 'No phone')}")
+    
+    print(f"   Found {len(pending_data)} pending registrations (these will need to be re-processed)")
+
 def backup_existing_data(data_dir):
     """Create backup of existing JSON files"""
     print("🔄 Creating backup of existing data...")
@@ -280,7 +303,7 @@ def main():
     print("=" * 50)
     
     # Setup
-    app = create_app()
+    app = create_migration_app()
     data_dir = os.path.join(os.path.dirname(__file__), 'data')
     
     if not os.path.exists(data_dir):
@@ -306,6 +329,7 @@ def main():
             migrate_transactions(data_dir, current_semester_id)
             migrate_budget_limits(data_dir, current_semester_id)
             migrate_treasurer_config(data_dir)
+            migrate_pending_brothers(data_dir)
             
             # Commit all changes
             db.session.commit()
