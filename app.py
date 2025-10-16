@@ -2809,68 +2809,92 @@ def dues_summary_page():
 @require_auth
 def transactions():
     """Show all transactions and outstanding dues in itemized list"""
-    if USE_DATABASE:
-        # Database mode - get transactions from DB
-        from models import Transaction, Member, Payment
-        all_items = []
+    try:
+        print(f"🔍 Transactions route: USE_DATABASE={USE_DATABASE}")
         
-        # Get all transactions
-        db_transactions = Transaction.query.order_by(Transaction.date.desc()).all()
-        for trans in db_transactions:
-            all_items.append({
-                'id': trans.id,
-                'date': trans.date.strftime('%Y-%m-%d'),
-                'description': trans.description,
-                'amount': trans.amount,
-                'category': trans.category,
-                'transaction_type': trans.type,
-                'type': 'transaction'
-            })
-        
-        # Get outstanding dues (members with unpaid balances)
-        members = Member.query.all()
-        for member in members:
-            total_paid = sum(p.amount for p in member.payments)
-            outstanding = member.dues_amount - total_paid
-            if outstanding > 0:
+        if USE_DATABASE:
+            # Database mode - get transactions from DB
+            print("🔍 Loading database models...")
+            from models import Transaction, Member, Payment
+            all_items = []
+            
+            # Get all transactions
+            print("🔍 Querying transactions...")
+            db_transactions = Transaction.query.order_by(Transaction.date.desc()).all()
+            print(f"🔍 Found {len(db_transactions)} transactions")
+            
+            for trans in db_transactions:
                 all_items.append({
-                    'id': f'outstanding_{member.id}',
-                    'date': 'Ongoing',
-                    'description': f'Outstanding dues - {member.name}',
-                    'amount': outstanding,
-                    'category': 'Dues',
-                    'transaction_type': 'outstanding',
-                    'type': 'outstanding'
+                    'id': trans.id,
+                    'date': trans.date.strftime('%Y-%m-%d'),
+                    'description': trans.description,
+                    'amount': trans.amount,
+                    'category': trans.category,
+                    'transaction_type': trans.type,
+                    'type': 'transaction'
                 })
+            
+            # Get outstanding dues (members with unpaid balances)
+            print("🔍 Querying members for outstanding dues...")
+            members = Member.query.all()
+            print(f"🔍 Found {len(members)} members")
+            
+            for member in members:
+                try:
+                    total_paid = sum(p.amount for p in member.payments)
+                    outstanding = member.dues_amount - total_paid
+                    if outstanding > 0:
+                        all_items.append({
+                            'id': f'outstanding_{member.id}',
+                            'date': 'Ongoing',
+                            'description': f'Outstanding dues - {member.name}',
+                            'amount': outstanding,
+                            'category': 'Dues',
+                            'transaction_type': 'outstanding',
+                            'type': 'outstanding'
+                        })
+                except Exception as e:
+                    print(f"⚠️ Error processing member {member.name}: {e}")
+            
+            # Calculate totals
+            total_income = sum(item['amount'] for item in all_items 
+                              if item['transaction_type'] == 'income')
+            total_expenses = sum(item['amount'] for item in all_items 
+                                if item['transaction_type'] == 'expense')
+            total_outstanding = sum(item['amount'] for item in all_items 
+                                   if item['transaction_type'] == 'outstanding')
+            
+            print(f"🔍 Totals: income={total_income}, expenses={total_expenses}, outstanding={total_outstanding}")
+            
+        elif treasurer_app:
+            # JSON mode
+            print("🔍 Using JSON mode...")
+            all_items = treasurer_app.get_all_financial_items()
+            
+            # Calculate totals
+            total_income = sum(item['amount'] for item in all_items 
+                              if item['transaction_type'] == 'income')
+            total_expenses = sum(item['amount'] for item in all_items 
+                                if item['transaction_type'] == 'expense')
+            total_outstanding = sum(item['amount'] for item in all_items 
+                                   if item['transaction_type'] == 'outstanding')
+        else:
+            print("🔍 No data source available")
+            all_items = []
+            total_income = total_expenses = total_outstanding = 0
         
-        # Calculate totals
-        total_income = sum(item['amount'] for item in all_items 
-                          if item['transaction_type'] == 'income')
-        total_expenses = sum(item['amount'] for item in all_items 
-                            if item['transaction_type'] == 'expense')
-        total_outstanding = sum(item['amount'] for item in all_items 
-                               if item['transaction_type'] == 'outstanding')
+        print(f"🔍 Rendering template with {len(all_items)} items")
+        return render_template('transactions.html',
+                             transactions=all_items,
+                             total_income=total_income,
+                             total_expenses=total_expenses,
+                             total_outstanding=total_outstanding)
         
-    elif treasurer_app:
-        # JSON mode
-        all_items = treasurer_app.get_all_financial_items()
-        
-        # Calculate totals
-        total_income = sum(item['amount'] for item in all_items 
-                          if item['transaction_type'] == 'income')
-        total_expenses = sum(item['amount'] for item in all_items 
-                            if item['transaction_type'] == 'expense')
-        total_outstanding = sum(item['amount'] for item in all_items 
-                               if item['transaction_type'] == 'outstanding')
-    else:
-        all_items = []
-        total_income = total_expenses = total_outstanding = 0
-    
-    return render_template('transactions.html',
-                         transactions=all_items,
-                         total_income=total_income,
-                         total_expenses=total_expenses,
-                         total_outstanding=total_outstanding)
+    except Exception as e:
+        print(f"❌ Transactions route error: {e}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        return f"Transactions Error: {str(e)}", 500
 
 # 4) ROUTES (make sure the route comes AFTER the function so Python knows it)
 
