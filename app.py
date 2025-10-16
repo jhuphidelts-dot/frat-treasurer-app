@@ -2511,7 +2511,7 @@ def record_payment():
             db.session.add(payment)
             db.session.commit()
             
-            print(f"✅ Payment recorded in database: {member.full_name} paid ${amount} via {payment_method}")
+            print(f"✅ Payment recorded in database: {member.name} paid ${amount} via {payment_method}")
             flash('Payment recorded successfully!', 'success')
             
         except Exception as e:
