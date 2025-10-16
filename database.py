@@ -65,6 +65,9 @@ def init_database(app):
             admin_role = Role.query.filter_by(name='admin').first()
             if admin_role:
                 admin_user.roles.append(admin_role)
+                print("✅ Assigned admin role to admin user")
+            else:
+                print("❌ Admin role not found in database")
             
             db.session.add(admin_user)
             db.session.commit()
@@ -72,6 +75,16 @@ def init_database(app):
             print("📱 Username: admin")
             print("🔒 Password: admin123")
             print("💡 Admin account has full system access")
+        else:
+            # Admin exists, but check if roles are assigned
+            admin_user = User.query.filter_by(phone="admin").first()
+            if admin_user and not admin_user.roles:
+                print("Admin user exists but has no roles - fixing...")
+                admin_role = Role.query.filter_by(name='admin').first()
+                if admin_role:
+                    admin_user.roles.append(admin_role)
+                    db.session.commit()
+                    print("✅ Fixed admin role assignment")
         
         # Separately, check if Ebubechi exists as a brother
         ebubechi = User.query.filter_by(phone="4808198055").first()
