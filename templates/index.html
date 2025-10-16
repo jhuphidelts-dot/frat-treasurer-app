@@ -427,8 +427,13 @@
                                 </thead>
                                 <tbody>
                                     {% for member_id, member in members.items() %}
-                                    {% set total_paid = member.payments_made|map(attribute='amount')|sum %}
-                                    {% set balance = member.dues_amount - total_paid %}
+                                    {% if member.total_paid is defined %}
+                                        {% set total_paid = member.total_paid %}
+                                        {% set balance = member.balance %}
+                                    {% else %}
+                                        {% set total_paid = member.payments_made|map(attribute='amount')|sum %}
+                                        {% set balance = member.dues_amount - total_paid %}
+                                    {% endif %}
                                     <tr>
                                         <td><a href="/member_details/{{ member_id }}" class="text-decoration-none">{{ member.name }}</a></td>
                                         <td>
