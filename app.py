@@ -2285,9 +2285,13 @@ def dashboard():
                 # Calculate total paid for this member
                 total_paid = sum(payment.amount for payment in member.payments)
                 
-                # Add payment info to member object for template display
+                print(f"🔍 {member.name}: ${member.dues_amount} dues, ${total_paid} paid, ${member.dues_amount - total_paid} balance")
+                
+                # Add payment info to member object for template display with multiple attribute names
                 member.total_paid = total_paid
                 member.balance = member.dues_amount - total_paid
+                member.paid = total_paid  # Template might expect 'paid' attribute
+                member.amount_paid = total_paid  # Another possible attribute name
                 
                 members[str(member.id)] = member
             
@@ -2323,9 +2327,12 @@ def dashboard():
             
             for limit in budget_limits:
                 # Calculate spending for this category
-                spent = sum(t.amount for t in Transaction.query.filter_by(type='expense', category=limit.category).all())
+                expense_transactions = Transaction.query.filter_by(type='expense', category=limit.category).all()
+                spent = sum(t.amount for t in expense_transactions)
                 remaining = limit.amount - spent
                 percent_used = (spent / limit.amount * 100) if limit.amount > 0 else 0
+                
+                print(f"🔍 Budget {limit.category}: ${limit.amount} limit, ${spent} spent ({len(expense_transactions)} transactions), ${remaining} remaining")
                 
                 # Create object-like dict that matches template expectations
                 budget_summary[limit.category] = {
