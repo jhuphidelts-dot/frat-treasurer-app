@@ -397,6 +397,7 @@ DEFAULT_ROLES = {
             'view_all_data': True,
             'edit_all_data': True,
             'manage_users': True,
+            'manage_roles': True,
             'approve_requests': True,
             'manage_budgets': True,
             'send_reminders': True
