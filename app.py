@@ -2266,7 +2266,10 @@ def landing_page():
 @app.route('/dashboard')
 @require_auth
 def dashboard():
-    if USE_DATABASE:
+    try:
+        print(f"🔍 Dashboard: USE_DATABASE={USE_DATABASE}")
+        
+        if USE_DATABASE:
         # Database mode - get data from SQLAlchemy models
         from models import BudgetLimit, Transaction
         
@@ -2274,20 +2277,31 @@ def dashboard():
         pending_brothers = {}  # No pending brothers in database mode for now
         
         # Get actual members from database
+        print("🔍 Querying members from database...")
         db_members = DBMember.query.all()
+        print(f"🔍 Found {len(db_members)} members")
+        
         for member in db_members:
             members[str(member.id)] = member
         
         # Calculate dues summary from database
+        print("🔍 Calculating dues summary...")
         total_projected = sum(member.dues_amount for member in db_members)
         total_collected = 0.0
         
         # Sum all payments made by all members
         for member in db_members:
-            total_collected += sum(payment.amount for payment in member.payments)
+            try:
+                member_payments = sum(payment.amount for payment in member.payments)
+                total_collected += member_payments
+                print(f"🔍 {member.name}: ${member_payments} paid of ${member.dues_amount} due")
+            except Exception as e:
+                print(f"⚠️ Error calculating payments for {member.name}: {e}")
         
         outstanding = total_projected - total_collected
         collection_rate = (total_collected / total_projected * 100) if total_projected > 0 else 0
+        
+        print(f"🔍 Totals: projected=${total_projected}, collected=${total_collected}, outstanding=${outstanding}")
         
         dues_summary = {
             'total_collected': total_collected,
@@ -2319,6 +2333,7 @@ def dashboard():
         
     else:
         # JSON mode - use treasurer_app
+        print("🔍 Using JSON mode...")
         if treasurer_app:
             dues_summary = treasurer_app.get_dues_collection_summary()
             members = treasurer_app.members
@@ -2331,12 +2346,19 @@ def dashboard():
             budget_summary = {}
             pending_brothers = {}
     
-    return render_template('index.html', 
-                         members=members,
-                         budget_summary=budget_summary,
-                         dues_summary=dues_summary,
-                         categories=BUDGET_CATEGORIES,
-                         pending_brothers=pending_brothers)
+        print(f"🔍 Rendering dashboard with {len(members)} members")
+        return render_template('index.html', 
+                             members=members,
+                             budget_summary=budget_summary,
+                             dues_summary=dues_summary,
+                             categories=BUDGET_CATEGORIES,
+                             pending_brothers=pending_brothers)
+    
+    except Exception as e:
+        print(f"❌ Dashboard error: {e}")
+        import traceback
+        print(f"❌ Dashboard traceback: {traceback.format_exc()}")
+        return f"Dashboard Error: {str(e)}", 500
 
 @app.route('/enhanced')
 @require_auth
