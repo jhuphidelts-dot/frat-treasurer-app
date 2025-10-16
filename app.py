@@ -2270,66 +2270,66 @@ def dashboard():
         print(f"🔍 Dashboard: USE_DATABASE={USE_DATABASE}")
         
         if USE_DATABASE:
-        # Database mode - get data from SQLAlchemy models
-        from models import BudgetLimit, Transaction
-        
-        members = {}
-        pending_brothers = {}  # No pending brothers in database mode for now
-        
-        # Get actual members from database
-        print("🔍 Querying members from database...")
-        db_members = DBMember.query.all()
-        print(f"🔍 Found {len(db_members)} members")
-        
-        for member in db_members:
-            members[str(member.id)] = member
-        
-        # Calculate dues summary from database
-        print("🔍 Calculating dues summary...")
-        total_projected = sum(member.dues_amount for member in db_members)
-        total_collected = 0.0
-        
-        # Sum all payments made by all members
-        for member in db_members:
-            try:
-                member_payments = sum(payment.amount for payment in member.payments)
-                total_collected += member_payments
-                print(f"🔍 {member.name}: ${member_payments} paid of ${member.dues_amount} due")
-            except Exception as e:
-                print(f"⚠️ Error calculating payments for {member.name}: {e}")
-        
-        outstanding = total_projected - total_collected
-        collection_rate = (total_collected / total_projected * 100) if total_projected > 0 else 0
-        
-        print(f"🔍 Totals: projected=${total_projected}, collected=${total_collected}, outstanding=${outstanding}")
-        
-        dues_summary = {
-            'total_collected': total_collected,
-            'total_projected': total_projected, 
-            'outstanding': outstanding,
-            'collection_rate': collection_rate
-        }
-        
-        # Get budget summary from database
-        budget_data = {}
-        budget_limits = BudgetLimit.query.all()
-        for limit in budget_limits:
-            budget_data[limit.category] = {
-                'limit': limit.amount,
-                'spent': 0.0
+            # Database mode - get data from SQLAlchemy models
+            from models import BudgetLimit, Transaction
+            
+            members = {}
+            pending_brothers = {}  # No pending brothers in database mode for now
+            
+            # Get actual members from database
+            print("🔍 Querying members from database...")
+            db_members = DBMember.query.all()
+            print(f"🔍 Found {len(db_members)} members")
+            
+            for member in db_members:
+                members[str(member.id)] = member
+            
+            # Calculate dues summary from database
+            print("🔍 Calculating dues summary...")
+            total_projected = sum(member.dues_amount for member in db_members)
+            total_collected = 0.0
+            
+            # Sum all payments made by all members
+            for member in db_members:
+                try:
+                    member_payments = sum(payment.amount for payment in member.payments)
+                    total_collected += member_payments
+                    print(f"🔍 {member.name}: ${member_payments} paid of ${member.dues_amount} due")
+                except Exception as e:
+                    print(f"⚠️ Error calculating payments for {member.name}: {e}")
+            
+            outstanding = total_projected - total_collected
+            collection_rate = (total_collected / total_projected * 100) if total_projected > 0 else 0
+            
+            print(f"🔍 Totals: projected=${total_projected}, collected=${total_collected}, outstanding=${outstanding}")
+            
+            dues_summary = {
+                'total_collected': total_collected,
+                'total_projected': total_projected, 
+                'outstanding': outstanding,
+                'collection_rate': collection_rate
             }
-        
-        # Calculate spending per category
-        transactions = Transaction.query.filter_by(type='expense').all()
-        for transaction in transactions:
-            if transaction.category in budget_data:
-                budget_data[transaction.category]['spent'] += transaction.amount
-        
-        # Calculate remaining amounts
-        for category, data in budget_data.items():
-            data['remaining'] = data['limit'] - data['spent']
-        
-        budget_summary = budget_data
+            
+            # Get budget summary from database
+            budget_data = {}
+            budget_limits = BudgetLimit.query.all()
+            for limit in budget_limits:
+                budget_data[limit.category] = {
+                    'limit': limit.amount,
+                    'spent': 0.0
+                }
+            
+            # Calculate spending per category
+            transactions = Transaction.query.filter_by(type='expense').all()
+            for transaction in transactions:
+                if transaction.category in budget_data:
+                    budget_data[transaction.category]['spent'] += transaction.amount
+            
+            # Calculate remaining amounts
+            for category, data in budget_data.items():
+                data['remaining'] = data['limit'] - data['spent']
+            
+            budget_summary = budget_data
         
     else:
         # JSON mode - use treasurer_app
@@ -2345,7 +2345,7 @@ def dashboard():
             members = {}
             budget_summary = {}
             pending_brothers = {}
-    
+        
         print(f"🔍 Rendering dashboard with {len(members)} members")
         return render_template('index.html', 
                              members=members,
