@@ -369,6 +369,19 @@ class TreasurerConfig(db.Model):
 
 # Default roles and permissions
 DEFAULT_ROLES = {
+    'admin': {
+        'description': 'System administrator with full access',
+        'permissions': {
+            'view_all_data': True,
+            'edit_all_data': True,
+            'manage_users': True,
+            'manage_roles': True,
+            'approve_requests': True,
+            'manage_budgets': True,
+            'send_reminders': True,
+            'system_admin': True
+        }
+    },
     'brother': {
         'description': 'Basic fraternity member',
         'permissions': {
