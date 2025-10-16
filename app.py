@@ -3106,9 +3106,23 @@ def transactions():
                 except Exception as e:
                     print(f"⚠️ Error processing member {member.name}: {e}")
             
-            # Calculate totals for display (include payments in income)
-            total_income = sum(item['amount'] for item in all_items 
-                              if item['transaction_type'] == 'income')
+            # Calculate totals avoiding double-counting of dues collection
+            # Get income from actual transactions (excluding Dues Collection to avoid double-counting payments)
+            transaction_income = sum(item['amount'] for item in all_items 
+                                   if item['transaction_type'] == 'income' and item['type'] == 'transaction' and item['category'] != 'Dues Collection')
+            
+            # Get income from payments (these are the actual dues collected)
+            payment_income = sum(item['amount'] for item in all_items 
+                               if item['transaction_type'] == 'income' and item['type'] == 'payment')
+            
+            # Include any manual "Dues Collection" transactions (but this might be double-counting)
+            dues_transactions = sum(item['amount'] for item in all_items 
+                                  if item['transaction_type'] == 'income' and item['type'] == 'transaction' and item['category'] == 'Dues Collection')
+            
+            # Total income = other income transactions + payment records
+            # (We exclude manual dues collection transactions to prevent double-counting with payment records)
+            total_income = transaction_income + payment_income
+            
             total_expenses = sum(item['amount'] for item in all_items 
                                 if item['transaction_type'] == 'expense')
             total_outstanding = sum(item['amount'] for item in all_items 
@@ -3116,6 +3130,8 @@ def transactions():
             
             # Calculate net position (all money in - all money out)
             net_position = total_income - total_expenses
+            
+            print(f"🔍 Income breakdown: transaction_income=${transaction_income}, payment_income=${payment_income}, dues_transactions=${dues_transactions}")
             
             print(f"🔍 Totals: income={total_income}, expenses={total_expenses}, outstanding={total_outstanding}")
             
