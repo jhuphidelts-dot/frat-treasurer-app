@@ -4163,6 +4163,33 @@ def debug_data_status():
     except Exception as e:
         return {'error': str(e), 'traceback': str(e.__traceback__)}
 
+@app.route('/debug/fix_roles')
+def debug_fix_roles():
+    """Check and create missing default roles"""
+    if not USE_DATABASE:
+        return {'error': 'Database mode not active'}
+    
+    try:
+        from models import Role, init_default_roles
+        
+        # Check current roles
+        existing_roles = [r.name for r in Role.query.all()]
+        
+        # Create missing roles
+        init_default_roles()
+        
+        # Check roles after init
+        all_roles = [r.name for r in Role.query.all()]
+        
+        return {
+            'existing_roles_before': existing_roles,
+            'all_roles_after': all_roles,
+            'roles_created': [r for r in all_roles if r not in existing_roles]
+        }
+        
+    except Exception as e:
+        return {'error': str(e)}
+
 @app.route('/debug/fix_admin_role')
 def debug_fix_admin_role():
     """Manually fix admin role assignment"""
@@ -4180,7 +4207,7 @@ def debug_fix_admin_role():
             return {'error': 'Admin user not found'}
         
         if not admin_role:
-            return {'error': 'Admin role not found'}
+            return {'error': 'Admin role not found - try /debug/fix_roles first'}
         
         # Check current roles
         current_roles = [r.name for r in admin_user.roles]
