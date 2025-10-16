@@ -2827,6 +2827,7 @@ def transactions():
                 all_items.append({
                     'id': trans.id,
                     'date': trans.date.strftime('%Y-%m-%d'),
+                    'date_str': trans.date.strftime('%Y-%m-%d'),  # Add date_str for template
                     'description': trans.description,
                     'amount': trans.amount,
                     'category': trans.category,
@@ -2847,6 +2848,7 @@ def transactions():
                         all_items.append({
                             'id': f'outstanding_{member.id}',
                             'date': 'Ongoing',
+                            'date_str': 'Ongoing',  # Add date_str for template
                             'description': f'Outstanding dues - {member.name}',
                             'amount': outstanding,
                             'category': 'Dues',
