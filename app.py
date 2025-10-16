@@ -2282,6 +2282,13 @@ def dashboard():
             print(f"🔍 Found {len(db_members)} members")
             
             for member in db_members:
+                # Calculate total paid for this member
+                total_paid = sum(payment.amount for payment in member.payments)
+                
+                # Add payment info to member object for template display
+                member.total_paid = total_paid
+                member.balance = member.dues_amount - total_paid
+                
                 members[str(member.id)] = member
             
             # Calculate dues summary from database
@@ -2740,18 +2747,38 @@ def remove_member(member_id):
 @app.route('/member_details/<member_id>')
 @require_auth
 def member_details(member_id):
-    if member_id not in treasurer_app.members:
-        flash('Member not found!')
-        return redirect(url_for('dashboard'))
-    
-    member = treasurer_app.members[member_id]
-    payment_schedule = treasurer_app.get_member_payment_schedule(member_id)
-    balance = treasurer_app.get_member_balance(member_id)
-    
-    return render_template('member_details.html',
-                         member=member,
-                         payment_schedule=payment_schedule,
-                         balance=balance)
+    if USE_DATABASE:
+        # Database mode
+        member = DBMember.query.get(member_id)
+        if not member:
+            flash('Member not found!')
+            return redirect(url_for('dashboard'))
+        
+        # Calculate balance from payments
+        total_paid = sum(payment.amount for payment in member.payments)
+        balance = member.dues_amount - total_paid
+        
+        # Mock payment schedule for now - TODO: implement proper schedule logic
+        payment_schedule = []
+        
+        return render_template('member_details.html',
+                             member=member,
+                             payment_schedule=payment_schedule,
+                             balance=balance)
+    else:
+        # JSON mode
+        if treasurer_app and member_id in treasurer_app.members:
+            member = treasurer_app.members[member_id]
+            payment_schedule = treasurer_app.get_member_payment_schedule(member_id)
+            balance = treasurer_app.get_member_balance(member_id)
+            
+            return render_template('member_details.html',
+                                 member=member,
+                                 payment_schedule=payment_schedule,
+                                 balance=balance)
+        else:
+            flash('Member not found!')
+            return redirect(url_for('dashboard'))
 
 @app.route('/budget_management', methods=['GET', 'POST'])
 @require_auth
