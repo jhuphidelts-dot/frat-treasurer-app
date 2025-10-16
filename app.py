@@ -4248,6 +4248,43 @@ def debug_init_db():
     except Exception as e:
         return {'error': str(e)}
 
+@app.route('/debug/payment_status')
+def debug_payment_status():
+    """Debug payment data specifically"""
+    if not USE_DATABASE:
+        return {'error': 'Database mode not active'}
+    
+    try:
+        from models import User, Role, Member, Transaction, Payment
+        
+        # Get sample members with their payments
+        members = Member.query.limit(10).all()
+        member_data = []
+        
+        for member in members:
+            payment_count = len(member.payments)
+            total_paid = sum(p.amount for p in member.payments)
+            
+            member_data.append({
+                'name': member.name,
+                'dues': member.dues_amount,
+                'payment_count': payment_count,
+                'total_paid': total_paid,
+                'payments': [{
+                    'amount': p.amount,
+                    'date': p.date.strftime('%Y-%m-%d'),
+                    'method': p.payment_method
+                } for p in member.payments[:3]]  # First 3 payments
+            })
+        
+        return {
+            'member_payment_data': member_data,
+            'total_payments_in_db': Payment.query.count()
+        }
+        
+    except Exception as e:
+        return {'error': str(e)}
+
 @app.route('/debug/data_status')
 def debug_data_status():
     """Check what data exists in the database"""
