@@ -231,7 +231,21 @@
                                                         </button>
                                                     </form>
                                                 </div>
-                                            {% else %}
+                                            {% elif item.type == 'payment' %}
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <a href="{{ url_for('edit_payment', payment_id=item.id.replace('payment_', '')) }}" 
+                                                       class="btn btn-outline-primary btn-sm" title="Edit Payment">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <form method="POST" action="{{ url_for('remove_payment', payment_id=item.id.replace('payment_', '')) }}" 
+                                                          class="d-inline" 
+                                                          onsubmit="return confirm('Are you sure you want to delete this payment?')">
+                                                        <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete Payment">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            {% elif item.type == 'outstanding' %}
                                                 <small class="text-muted">Outstanding dues</small>
                                             {% endif %}
                                         </td>
@@ -254,16 +268,18 @@
                         <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
                     </a>
                 </div>
-            </div>
-        </div>
-    </div>
+{% endblock %}
 
-                <!-- Back to Dashboard -->
-                <div class="text-center mt-4">
-                    <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg">
-                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
-                    </a>
-                </div>
+{% block extra_js %}
+<script>
+    // Global variables for filtering
+    let currentTypeFilter = 'all';
+    let currentCategoryFilter = 'all';
+
+    function filterTransactions(type) {
+        currentTypeFilter = type;
+        applyFilters();
+        
         // Update button states
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.classList.remove('btn-primary');
@@ -325,8 +341,10 @@
 
     // Initialize with all items filter active
     document.addEventListener('DOMContentLoaded', function() {
-        document.querySelector('.filter-btn').classList.remove('btn-outline-primary');
-        document.querySelector('.filter-btn').classList.add('btn-primary');
+        const firstFilterBtn = document.querySelector('.filter-btn');
+        if (firstFilterBtn) {
+            firstFilterBtn.classList.remove('btn-outline-primary');
+            firstFilterBtn.classList.add('btn-primary');
+        }
     });
 </script>
-{% endblock %}

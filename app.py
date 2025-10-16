@@ -2530,6 +2530,63 @@ def record_payment():
     
     return redirect(url_for('dashboard'))
 
+@app.route('/edit_payment/<payment_id>', methods=['GET', 'POST'])
+@require_auth
+@require_permission('record_payments')
+def edit_payment(payment_id):
+    """Edit an existing payment"""
+    if USE_DATABASE:
+        from models import Payment, Member as DBMember, db
+        
+        payment = Payment.query.get_or_404(int(payment_id))
+        
+        if request.method == 'GET':
+            members = DBMember.query.all()
+            return render_template('edit_payment.html', payment=payment, members=members)
+        
+        # POST request - update payment
+        try:
+            payment.member_id = int(request.form['member_id'])
+            payment.amount = float(request.form['amount'])
+            payment.payment_method = request.form['payment_method']
+            
+            db.session.commit()
+            flash('Payment updated successfully!', 'success')
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating payment: {e}', 'error')
+    else:
+        flash('Payment editing not available in JSON mode', 'error')
+    
+    return redirect(url_for('transactions'))
+
+@app.route('/remove_payment/<payment_id>', methods=['POST'])
+@require_auth
+@require_permission('record_payments')
+def remove_payment(payment_id):
+    """Delete a payment"""
+    if USE_DATABASE:
+        from models import Payment, db
+        
+        try:
+            payment = Payment.query.get_or_404(int(payment_id))
+            member_name = payment.member.name
+            amount = payment.amount
+            
+            db.session.delete(payment)
+            db.session.commit()
+            
+            flash(f'Payment of ${amount} from {member_name} deleted successfully!', 'success')
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error deleting payment: {e}', 'error')
+    else:
+        flash('Payment deletion not available in JSON mode', 'error')
+    
+    return redirect(url_for('transactions'))
+
 @app.route('/send_reminders')
 @require_auth
 @require_permission('send_reminders')
@@ -3019,7 +3076,8 @@ def transactions():
                     'amount': payment.amount,
                     'category': 'Dues Collection',
                     'transaction_type': 'income',
-                    'type': 'payment'
+                    'type': 'payment',
+                    'member_name': payment.member.name
                 })
             
             # Sort all items by date (newest first)
