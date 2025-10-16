@@ -3114,13 +3114,8 @@ def transactions():
             total_outstanding = sum(item['amount'] for item in all_items 
                                    if item['transaction_type'] == 'outstanding')
             
-            # Calculate net position (exclude payment records to avoid double-counting)
-            # Only use actual transaction records for net financial position
-            transaction_income = sum(item['amount'] for item in all_items 
-                                   if item['transaction_type'] == 'income' and item['type'] == 'transaction')
-            transaction_expenses = sum(item['amount'] for item in all_items 
-                                     if item['transaction_type'] == 'expense' and item['type'] == 'transaction')
-            net_position = transaction_income - transaction_expenses
+            # Calculate net position (all money in - all money out)
+            net_position = total_income - total_expenses
             
             print(f"🔍 Totals: income={total_income}, expenses={total_expenses}, outstanding={total_outstanding}")
             
@@ -3148,7 +3143,7 @@ def transactions():
                              total_income=total_income,
                              total_expenses=total_expenses,
                              total_outstanding=total_outstanding,
-                             net_position=net_position if USE_DATABASE else total_income - total_expenses)
+                             net_position=net_position)
         
     except Exception as e:
         print(f"❌ Transactions route error: {e}")
