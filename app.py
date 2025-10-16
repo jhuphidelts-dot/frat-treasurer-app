@@ -3106,13 +3106,21 @@ def transactions():
                 except Exception as e:
                     print(f"⚠️ Error processing member {member.name}: {e}")
             
-            # Calculate totals
+            # Calculate totals for display (include payments in income)
             total_income = sum(item['amount'] for item in all_items 
                               if item['transaction_type'] == 'income')
             total_expenses = sum(item['amount'] for item in all_items 
                                 if item['transaction_type'] == 'expense')
             total_outstanding = sum(item['amount'] for item in all_items 
                                    if item['transaction_type'] == 'outstanding')
+            
+            # Calculate net position (exclude payment records to avoid double-counting)
+            # Only use actual transaction records for net financial position
+            transaction_income = sum(item['amount'] for item in all_items 
+                                   if item['transaction_type'] == 'income' and item['type'] == 'transaction')
+            transaction_expenses = sum(item['amount'] for item in all_items 
+                                     if item['transaction_type'] == 'expense' and item['type'] == 'transaction')
+            net_position = transaction_income - transaction_expenses
             
             print(f"🔍 Totals: income={total_income}, expenses={total_expenses}, outstanding={total_outstanding}")
             
@@ -3128,17 +3136,19 @@ def transactions():
                                 if item['transaction_type'] == 'expense')
             total_outstanding = sum(item['amount'] for item in all_items 
                                    if item['transaction_type'] == 'outstanding')
+            net_position = total_income - total_expenses
         else:
             print("🔍 No data source available")
             all_items = []
-            total_income = total_expenses = total_outstanding = 0
+            total_income = total_expenses = total_outstanding = net_position = 0
         
         print(f"🔍 Rendering template with {len(all_items)} items")
         return render_template('transactions.html',
                              transactions=all_items,
                              total_income=total_income,
                              total_expenses=total_expenses,
-                             total_outstanding=total_outstanding)
+                             total_outstanding=total_outstanding,
+                             net_position=net_position if USE_DATABASE else total_income - total_expenses)
         
     except Exception as e:
         print(f"❌ Transactions route error: {e}")

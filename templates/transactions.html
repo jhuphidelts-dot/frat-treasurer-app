@@ -85,15 +85,14 @@
                     <div class="col-12">
                         <div class="summary-card text-center">
                             <h4><i class="fas fa-calculator me-2"></i>Net Financial Position</h4>
-                            {% set net_balance = total_income - total_expenses %}
                             <h2>
-                                {% if net_balance >= 0 %}
-                                    <i class="fas fa-plus-circle me-2"></i>${{ "%.2f"|format(net_balance) }}
+                                {% if net_position >= 0 %}
+                                    <i class="fas fa-plus-circle me-2"></i>${{ "%.2f"|format(net_position) }}
                                 {% else %}
-                                    <i class="fas fa-minus-circle me-2"></i>-${{ "%.2f"|format(net_balance|abs) }}
+                                    <i class="fas fa-minus-circle me-2"></i>-${{ "%.2f"|format(net_position|abs) }}
                                 {% endif %}
                             </h2>
-                            <p class="mb-0">Current Balance (excluding outstanding dues)</p>
+                            <p class="mb-0">Current Balance (transaction records only, excludes payment tracking)</p>
                         </div>
                     </div>
                 </div>
