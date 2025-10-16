@@ -2310,26 +2310,22 @@ def dashboard():
                 'collection_rate': collection_rate
             }
             
-            # Get budget summary from database
-            budget_data = {}
+            # Get budget summary from database - format to match template expectations
+            budget_summary = {}
             budget_limits = BudgetLimit.query.all()
+            
             for limit in budget_limits:
-                budget_data[limit.category] = {
-                    'limit': limit.amount,
-                    'spent': 0.0
+                # Calculate spending for this category
+                spent = sum(t.amount for t in Transaction.query.filter_by(type='expense', category=limit.category).all())
+                remaining = limit.amount - spent
+                
+                # Create object-like dict that matches template expectations
+                budget_summary[limit.category] = {
+                    'budget_limit': limit.amount,  # Template expects 'budget_limit' attribute
+                    'spent': spent,
+                    'remaining': remaining,
+                    'limit': limit.amount  # Also include 'limit' for backward compatibility
                 }
-            
-            # Calculate spending per category
-            transactions = Transaction.query.filter_by(type='expense').all()
-            for transaction in transactions:
-                if transaction.category in budget_data:
-                    budget_data[transaction.category]['spent'] += transaction.amount
-            
-            # Calculate remaining amounts
-            for category, data in budget_data.items():
-                data['remaining'] = data['limit'] - data['spent']
-            
-            budget_summary = budget_data
         
         else:
             # JSON mode - use treasurer_app
