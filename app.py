@@ -2121,27 +2121,47 @@ def inject_permission_functions():
 
 def authenticate_user_dual(username, password):
     """Authenticate user using either database or JSON system"""
-    if USE_DATABASE:
-        # Database authentication
-        user = None
-        
-        # Check for admin username (special case)
-        if username == 'admin':
-            user = User.query.filter_by(phone='admin').first()
+    try:
+        if USE_DATABASE:
+            # Database authentication
+            user = None
+            
+            print(f"🔍 DB Auth: Looking for username '{username}'")
+            
+            # Check for admin username (special case)
+            if username == 'admin':
+                user = User.query.filter_by(phone='admin').first()
+                print(f"🔍 Admin user found: {user}")
+            else:
+                # Check by phone number or email for regular users
+                user = User.query.filter_by(phone=username).first()
+                if not user:
+                    user = User.query.filter_by(email=username).first()
+                print(f"🔍 Regular user found: {user}")
+            
+            if user:
+                print(f"🔍 Checking password for user: {user.phone}")
+                if user.check_password(password):
+                    primary_role = user.get_primary_role()
+                    role_name = primary_role.name if primary_role else 'brother'
+                    print(f"🔍 Password valid, role: {role_name}")
+                    return user, role_name
+                else:
+                    print(f"🔍 Password invalid")
+            else:
+                print(f"🔍 No user found with username: {username}")
+            
+            return None, None
         else:
-            # Check by phone number or email for regular users
-            user = User.query.filter_by(phone=username).first()
-            if not user:
-                user = User.query.filter_by(email=username).first()
-        
-        if user and user.check_password(password):
-            return user, user.get_primary_role().name if user.get_primary_role() else 'brother'
-        return None, None
-    else:
-        # JSON authentication
-        if treasurer_app and treasurer_app.authenticate_user(username, password):
-            role = treasurer_app.users[username]['role']
-            return username, role
+            # JSON authentication
+            if treasurer_app and treasurer_app.authenticate_user(username, password):
+                role = treasurer_app.users[username]['role']
+                return username, role
+            return None, None
+    except Exception as e:
+        print(f"❌ Authentication error: {e}")
+        import traceback
+        print(f"❌ Auth traceback: {traceback.format_exc()}")
         return None, None
 
 # Flask routes
@@ -2153,29 +2173,41 @@ def login():
     username = request.form['username']
     password = request.form['password']
     
-    user, role = authenticate_user_dual(username, password)
-    
-    if user:
-        if USE_DATABASE:
-            # Database login
-            login_user(user, remember=True)
-            session['user'] = user.phone
-            session['role'] = role
-            session['user_id'] = user.id
-            flash(f'Welcome, {user.first_name}!')
-        else:
-            # JSON login
-            session['user'] = username
-            session['role'] = role
-            flash(f'Welcome, {username}!')
+    try:
+        print(f"🔍 Login attempt: username='{username}', database_mode={USE_DATABASE}")
+        user, role = authenticate_user_dual(username, password)
+        print(f"🔍 Authentication result: user={user}, role={role}")
         
-        # Redirect based on user type
-        if role == 'brother':
-            return redirect(url_for('brother_dashboard'))
+        if user:
+            if USE_DATABASE:
+                # Database login
+                print(f"🔍 Database login: user.id={user.id}, user.phone={user.phone}")
+                login_user(user, remember=True)
+                session['user'] = user.phone
+                session['role'] = role
+                session['user_id'] = user.id
+                flash(f'Welcome, {user.first_name}!')
+            else:
+                # JSON login
+                session['user'] = username
+                session['role'] = role
+                flash(f'Welcome, {username}!')
+            
+            # Redirect based on user type
+            if role == 'brother':
+                return redirect(url_for('brother_dashboard'))
+            else:
+                return redirect(url_for('dashboard'))
         else:
-            return redirect(url_for('dashboard'))
-    else:
-        flash('Invalid username or password')
+            print(f"🔍 Authentication failed for username: {username}")
+            flash('Invalid username or password')
+            return redirect(url_for('login'))
+    
+    except Exception as e:
+        print(f"❌ Login error: {e}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        flash('Login system error - check server logs')
         return redirect(url_for('login'))
 
 @app.route('/logout')
