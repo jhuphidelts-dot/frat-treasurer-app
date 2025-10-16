@@ -2318,13 +2318,16 @@ def dashboard():
                 # Calculate spending for this category
                 spent = sum(t.amount for t in Transaction.query.filter_by(type='expense', category=limit.category).all())
                 remaining = limit.amount - spent
+                percent_used = (spent / limit.amount * 100) if limit.amount > 0 else 0
                 
                 # Create object-like dict that matches template expectations
                 budget_summary[limit.category] = {
                     'budget_limit': limit.amount,  # Template expects 'budget_limit' attribute
                     'spent': spent,
                     'remaining': remaining,
-                    'limit': limit.amount  # Also include 'limit' for backward compatibility
+                    'percent_used': percent_used,  # Template expects 'percent_used' attribute
+                    'limit': limit.amount,  # Also include 'limit' for backward compatibility
+                    'amount': spent  # Template might expect 'amount' for spent
                 }
         
         else:
