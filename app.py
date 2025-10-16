@@ -4098,6 +4098,39 @@ def debug_init_db():
     except Exception as e:
         return {'error': str(e)}
 
+@app.route('/debug/data_status')
+def debug_data_status():
+    """Check what data exists in the database"""
+    if not USE_DATABASE:
+        return {'error': 'Database mode not active'}
+    
+    try:
+        from models import User, Role, Member, Transaction, Payment, BudgetLimit, Semester
+        
+        data_status = {
+            'users': User.query.count(),
+            'roles': Role.query.count(), 
+            'members': Member.query.count(),
+            'transactions': Transaction.query.count(),
+            'payments': Payment.query.count(),
+            'budget_limits': BudgetLimit.query.count(),
+            'semesters': Semester.query.count()
+        }
+        
+        # Get sample data
+        sample_users = [{'phone': u.phone, 'name': f'{u.first_name} {u.last_name}', 'roles': [r.name for r in u.roles]} for u in User.query.limit(5).all()]
+        sample_members = [{'name': m.name, 'dues': m.dues_amount, 'payments': len(m.payments)} for m in Member.query.limit(5).all()]
+        sample_transactions = [{'date': t.date.strftime('%Y-%m-%d'), 'description': t.description, 'amount': t.amount, 'type': t.type} for t in Transaction.query.limit(5).all()]
+        
+        return {
+            'counts': data_status,
+            'sample_users': sample_users,
+            'sample_members': sample_members, 
+            'sample_transactions': sample_transactions
+        }
+    except Exception as e:
+        return {'error': str(e), 'traceback': str(e.__traceback__)}
+
 # This app is designed to run exclusively on cloud platforms (Render.com)
 # Local development has been disabled - use the live deployment only
 if __name__ == '__main__':
