@@ -2792,12 +2792,54 @@ def member_details(member_id):
 @require_permission('manage_budgets')
 def budget_management():
     if request.method == 'GET':
-        dues_summary = treasurer_app.get_dues_collection_summary()
-        return render_template('budget_management.html',
-                             budget_limits=treasurer_app.budget_limits,
-                             budget_summary=treasurer_app.get_budget_summary(),
-                             dues_summary=dues_summary,
-                             categories=BUDGET_CATEGORIES)
+        if USE_DATABASE:
+            # Database mode - get budget data
+            from models import BudgetLimit, Transaction, Member
+            
+            # Calculate dues summary
+            members = Member.query.all()
+            total_projected = sum(member.dues_amount for member in members)
+            total_collected = sum(sum(payment.amount for payment in member.payments) for member in members)
+            outstanding = total_projected - total_collected
+            collection_rate = (total_collected / total_projected * 100) if total_projected > 0 else 0
+            
+            dues_summary = {
+                'total_collected': total_collected,
+                'total_projected': total_projected,
+                'outstanding': outstanding,
+                'collection_rate': collection_rate
+            }
+            
+            # Get budget limits
+            budget_limits_data = {}
+            budget_limits = BudgetLimit.query.all()
+            for limit in budget_limits:
+                budget_limits_data[limit.category] = limit.amount
+            
+            # Get budget summary
+            budget_summary = {}
+            for limit in budget_limits:
+                spent = sum(t.amount for t in Transaction.query.filter_by(type='expense', category=limit.category).all())
+                budget_summary[limit.category] = {
+                    'budget_limit': limit.amount,
+                    'spent': spent,
+                    'remaining': limit.amount - spent,
+                    'percent_used': (spent / limit.amount * 100) if limit.amount > 0 else 0
+                }
+            
+            return render_template('budget_management.html',
+                                 budget_limits=budget_limits_data,
+                                 budget_summary=budget_summary,
+                                 dues_summary=dues_summary,
+                                 categories=BUDGET_CATEGORIES)
+        else:
+            # JSON mode
+            dues_summary = treasurer_app.get_dues_collection_summary()
+            return render_template('budget_management.html',
+                                 budget_limits=treasurer_app.budget_limits,
+                                 budget_summary=treasurer_app.get_budget_summary(),
+                                 dues_summary=dues_summary,
+                                 categories=BUDGET_CATEGORIES)
     
     # POST request - update budget limits
     for category in BUDGET_CATEGORIES:
