@@ -2268,17 +2268,54 @@ def landing_page():
 def dashboard():
     if USE_DATABASE:
         # Database mode - get data from SQLAlchemy models
+        from models import BudgetLimit, Transaction
         
-        # Mock data for now - TODO: implement proper database queries
         members = {}
-        budget_summary = {}
-        dues_summary = {'total_collected': 0.0, 'total_projected': 0.0, 'outstanding': 0.0, 'collection_rate': 0.0}
-        pending_brothers = {}
+        pending_brothers = {}  # No pending brothers in database mode for now
         
         # Get actual members from database
         db_members = DBMember.query.all()
         for member in db_members:
             members[str(member.id)] = member
+        
+        # Calculate dues summary from database
+        total_projected = sum(member.dues_amount for member in db_members)
+        total_collected = 0.0
+        
+        # Sum all payments made by all members
+        for member in db_members:
+            total_collected += sum(payment.amount for payment in member.payments)
+        
+        outstanding = total_projected - total_collected
+        collection_rate = (total_collected / total_projected * 100) if total_projected > 0 else 0
+        
+        dues_summary = {
+            'total_collected': total_collected,
+            'total_projected': total_projected, 
+            'outstanding': outstanding,
+            'collection_rate': collection_rate
+        }
+        
+        # Get budget summary from database
+        budget_data = {}
+        budget_limits = BudgetLimit.query.all()
+        for limit in budget_limits:
+            budget_data[limit.category] = {
+                'limit': limit.amount,
+                'spent': 0.0
+            }
+        
+        # Calculate spending per category
+        transactions = Transaction.query.filter_by(type='expense').all()
+        for transaction in transactions:
+            if transaction.category in budget_data:
+                budget_data[transaction.category]['spent'] += transaction.amount
+        
+        # Calculate remaining amounts
+        for category, data in budget_data.items():
+            data['remaining'] = data['limit'] - data['spent']
+        
+        budget_summary = budget_data
         
     else:
         # JSON mode - use treasurer_app
