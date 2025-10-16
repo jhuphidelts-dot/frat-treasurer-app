@@ -3005,6 +3005,26 @@ def transactions():
                     'type': 'transaction'
                 })
             
+            # Get all payments as income transactions
+            print("🔍 Querying payments...")
+            db_payments = Payment.query.order_by(Payment.date.desc()).all()
+            print(f"🔍 Found {len(db_payments)} payments")
+            
+            for payment in db_payments:
+                all_items.append({
+                    'id': f'payment_{payment.id}',
+                    'date': payment.date.strftime('%Y-%m-%d'),
+                    'date_str': payment.date.strftime('%Y-%m-%d'),
+                    'description': f'Payment from {payment.member.name} ({payment.payment_method})',
+                    'amount': payment.amount,
+                    'category': 'Dues Collection',
+                    'transaction_type': 'income',
+                    'type': 'payment'
+                })
+            
+            # Sort all items by date (newest first)
+            all_items.sort(key=lambda x: x['date'] if x['date'] != 'Ongoing' else '1900-01-01', reverse=True)
+            
             # Get outstanding dues (members with unpaid balances)
             print("🔍 Querying members for outstanding dues...")
             members = Member.query.all()
