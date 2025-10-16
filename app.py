@@ -2331,20 +2331,20 @@ def dashboard():
             
             budget_summary = budget_data
         
-    else:
-        # JSON mode - use treasurer_app
-        print("🔍 Using JSON mode...")
-        if treasurer_app:
-            dues_summary = treasurer_app.get_dues_collection_summary()
-            members = treasurer_app.members
-            budget_summary = treasurer_app.get_budget_summary()
-            pending_brothers = treasurer_app.pending_brothers
         else:
-            # Fallback if treasurer_app is None
-            dues_summary = {'total_collected': 0.0, 'total_projected': 0.0, 'outstanding': 0.0, 'collection_rate': 0.0}
-            members = {}
-            budget_summary = {}
-            pending_brothers = {}
+            # JSON mode - use treasurer_app
+            print("🔍 Using JSON mode...")
+            if treasurer_app:
+                dues_summary = treasurer_app.get_dues_collection_summary()
+                members = treasurer_app.members
+                budget_summary = treasurer_app.get_budget_summary()
+                pending_brothers = treasurer_app.pending_brothers
+            else:
+                # Fallback if treasurer_app is None
+                dues_summary = {'total_collected': 0.0, 'total_projected': 0.0, 'outstanding': 0.0, 'collection_rate': 0.0}
+                members = {}
+                budget_summary = {}
+                pending_brothers = {}
         
         print(f"🔍 Rendering dashboard with {len(members)} members")
         return render_template('index.html', 
