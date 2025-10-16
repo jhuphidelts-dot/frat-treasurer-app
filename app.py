@@ -2487,10 +2487,46 @@ def record_payment():
     amount = float(request.form['amount'])
     payment_method = request.form['payment_method']
     
-    if treasurer_app.record_payment(member_id, amount, payment_method):
-        flash('Payment recorded successfully!')
+    print(f"🔍 Recording payment: member_id={member_id}, amount=${amount}, method={payment_method}")
+    
+    if USE_DATABASE:
+        # Database mode - record payment in SQLAlchemy
+        try:
+            from models import Member as DBMember, Payment, db
+            
+            # Find the member
+            member = DBMember.query.get(int(member_id))
+            if not member:
+                flash('Member not found!', 'error')
+                return redirect(url_for('dashboard'))
+            
+            # Create payment record
+            payment = Payment(
+                member_id=int(member_id),
+                amount=amount,
+                payment_method=payment_method,
+                date=datetime.now().date()
+            )
+            
+            db.session.add(payment)
+            db.session.commit()
+            
+            print(f"✅ Payment recorded in database: {member.full_name} paid ${amount} via {payment_method}")
+            flash('Payment recorded successfully!', 'success')
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ Database payment recording failed: {e}")
+            flash(f'Error recording payment: {e}', 'error')
+    
+    elif treasurer_app:
+        # JSON mode - use treasurer_app
+        if treasurer_app.record_payment(member_id, amount, payment_method):
+            flash('Payment recorded successfully!')
+        else:
+            flash('Error recording payment!')
     else:
-        flash('Error recording payment!')
+        flash('Application not properly initialized', 'error')
     
     return redirect(url_for('dashboard'))
 
