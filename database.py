@@ -44,45 +44,55 @@ def init_database(app):
         # Initialize default roles
         init_default_roles()
         
-        # Check if there's a treasurer user
+        # Check if there's an admin user
         from models import User, Role
-        treasurer = User.query.join(User.roles).filter(Role.name == 'treasurer').first()
         admin = User.query.join(User.roles).filter(Role.name == 'admin').first()
         
-        if not treasurer or not admin:
-            print("Setting up Ebubechi Onyia with admin and treasurer roles...")
+        if not admin:
+            print("Creating admin account for system management...")
             
-            # Check if Ebubechi already exists
-            ebubechi = User.query.filter_by(phone="4808198055").first()
-            if not ebubechi:
-                # Create Ebubechi as a brother
-                ebubechi = User(
-                    phone="4808198055",  # Correct phone number
-                    first_name="Ebubechi",
-                    last_name="Onyia",
-                    email="ebubechi@example.com",  # Update with your real email
-                    status="active"
-                )
-                ebubechi.set_password("treasurer2024")  # Secure initial password
-                db.session.add(ebubechi)
-                print("✅ Created Ebubechi Onyia user account")
+            # Create admin user (separate from brother accounts)
+            admin_user = User(
+                phone="admin",  # Special admin identifier
+                first_name="System",
+                last_name="Admin",
+                email="admin@example.com",
+                status="active"
+            )
+            admin_user.set_password("admin123")  # Keep familiar admin password
             
-            # Assign admin role (permanent access)
+            # Assign admin role (permanent system access)
             admin_role = Role.query.filter_by(name='admin').first()
-            if admin_role and admin_role not in ebubechi.roles:
-                ebubechi.roles.append(admin_role)
-                print("✅ Assigned admin role (permanent access)")
+            if admin_role:
+                admin_user.roles.append(admin_role)
             
-            # Assign treasurer role (transferable)
-            treasurer_role = Role.query.filter_by(name='treasurer').first()
-            if treasurer_role and treasurer_role not in ebubechi.roles:
-                ebubechi.roles.append(treasurer_role)
-                print("✅ Assigned treasurer role (transferable)")
-            
+            db.session.add(admin_user)
             db.session.commit()
+            print("✅ Created admin account")
+            print("📱 Username: admin")
+            print("🔒 Password: admin123")
+            print("💡 Admin account has full system access")
+        
+        # Separately, check if Ebubechi exists as a brother
+        ebubechi = User.query.filter_by(phone="4808198055").first()
+        if not ebubechi:
+            print("Creating Ebubechi as a brother account...")
+            ebubechi = User(
+                phone="4808198055",
+                first_name="Ebubechi",
+                last_name="Onyia",
+                email="ebubechi@example.com",
+                status="active"
+            )
+            ebubechi.set_password("brother2024")
+            
+            # Ebubechi can have fraternity roles assigned later via admin panel
+            db.session.add(ebubechi)
+            db.session.commit()
+            print("✅ Created Ebubechi as brother account")
             print("📱 Phone: 4808198055")
-            print("🔒 Password: treasurer2024")
-            print("💡 Admin role = permanent access, Treasurer role = transferable")
+            print("🔒 Password: brother2024")
+            print("💡 Roles can be assigned via admin panel")
         
         print("Database initialized successfully!")
 

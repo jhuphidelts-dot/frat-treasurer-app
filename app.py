@@ -2123,9 +2123,16 @@ def authenticate_user_dual(username, password):
     """Authenticate user using either database or JSON system"""
     if USE_DATABASE:
         # Database authentication
-        user = User.query.filter_by(phone=username).first()
-        if not user:
-            user = User.query.filter_by(email=username).first()
+        user = None
+        
+        # Check for admin username (special case)
+        if username == 'admin':
+            user = User.query.filter_by(phone='admin').first()
+        else:
+            # Check by phone number or email for regular users
+            user = User.query.filter_by(phone=username).first()
+            if not user:
+                user = User.query.filter_by(email=username).first()
         
         if user and user.check_password(password):
             return user, user.get_primary_role().name if user.get_primary_role() else 'brother'
