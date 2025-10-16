@@ -4163,6 +4163,38 @@ def debug_data_status():
     except Exception as e:
         return {'error': str(e), 'traceback': str(e.__traceback__)}
 
+@app.route('/debug/fix_admin_role')
+def debug_fix_admin_role():
+    """Manually fix admin role assignment"""
+    if not USE_DATABASE:
+        return {'error': 'Database mode not active'}
+    
+    try:
+        from models import User, Role
+        
+        # Get admin user and admin role
+        admin_user = User.query.filter_by(phone='admin').first()
+        admin_role = Role.query.filter_by(name='admin').first()
+        
+        if not admin_user:
+            return {'error': 'Admin user not found'}
+        
+        if not admin_role:
+            return {'error': 'Admin role not found'}
+        
+        # Check current roles
+        current_roles = [r.name for r in admin_user.roles]
+        
+        if 'admin' not in current_roles:
+            admin_user.roles.append(admin_role)
+            db.session.commit()
+            return {'success': True, 'message': f'Admin role added. User now has roles: {[r.name for r in admin_user.roles]}'}
+        else:
+            return {'success': True, 'message': f'Admin user already has admin role. Current roles: {current_roles}'}
+            
+    except Exception as e:
+        return {'error': str(e)}
+
 # This app is designed to run exclusively on cloud platforms (Render.com)
 # Local development has been disabled - use the live deployment only
 if __name__ == '__main__':
