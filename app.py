@@ -2248,14 +2248,42 @@ def change_password():
 @require_auth
 def monthly_income():
     try:
-        print(f"🔍 Monthly income route called")
-        if not treasurer_app:
-            print(f"❌ Treasurer app is None")
-            flash('Application not properly initialized', 'error')
-            return redirect(url_for('dashboard'))
+        print(f"🔍 Monthly income route called, USE_DATABASE={USE_DATABASE}")
         
-        monthly_data = treasurer_app.get_monthly_income_summary()
-        print(f"🔍 Monthly data: {len(monthly_data) if monthly_data else 0} months")
+        if USE_DATABASE:
+            # Database mode - get data from SQLAlchemy models
+            from models import Payment
+            print("🔍 Using database mode for monthly income")
+            
+            # Get all payments grouped by month
+            payments = Payment.query.all()
+            monthly_data = {}
+            
+            for payment in payments:
+                month_key = payment.date.strftime('%Y-%m')
+                month_name = payment.date.strftime('%B %Y')
+                
+                if month_key not in monthly_data:
+                    monthly_data[month_key] = {
+                        'month_name': month_name,
+                        'total_amount': 0.0,
+                        'transaction_count': 0
+                    }
+                
+                monthly_data[month_key]['total_amount'] += payment.amount
+                monthly_data[month_key]['transaction_count'] += 1
+            
+            print(f"🔍 Monthly data: {len(monthly_data)} months from database")
+            
+        elif treasurer_app:
+            # JSON mode
+            print("🔍 Using JSON mode for monthly income")
+            monthly_data = treasurer_app.get_monthly_income_summary()
+            print(f"🔍 Monthly data: {len(monthly_data) if monthly_data else 0} months from JSON")
+        else:
+            print("❌ No data source available")
+            monthly_data = {}
+            
         return render_template('monthly_income.html', monthly_data=monthly_data)
     except Exception as e:
         print(f"❌ Monthly income error: {e}")
@@ -3064,17 +3092,56 @@ def custom_payment_schedule(member_id):
 @require_auth
 def dues_summary_page():
     try:
-        print(f"🔍 Dues summary route called")
-        if not treasurer_app:
-            print(f"❌ Treasurer app is None")
-            flash('Application not properly initialized', 'error')
-            return redirect(url_for('dashboard'))
+        print(f"🔍 Dues summary route called, USE_DATABASE={USE_DATABASE}")
+        
+        if USE_DATABASE:
+            # Database mode - get data from SQLAlchemy models
+            from models import Member, Payment
+            print("🔍 Using database mode for dues summary")
             
-        dues_summary = treasurer_app.get_dues_collection_summary()
+            db_members = Member.query.all()
+            members = {}
+            
+            # Build members dictionary for template
+            for member in db_members:
+                total_paid = sum(payment.amount for payment in member.payments)
+                members[str(member.id)] = {
+                    'name': member.full_name,
+                    'dues_amount': member.dues_amount,
+                    'payments_made': [{'amount': p.amount, 'date': p.date.strftime('%Y-%m-%d'), 'method': p.payment_method} for p in member.payments]
+                }
+            
+            # Calculate dues summary
+            total_projected = sum(member.dues_amount for member in db_members)
+            total_collected = sum(sum(payment.amount for payment in member.payments) for member in db_members)
+            outstanding = total_projected - total_collected
+            collection_rate = (total_collected / total_projected * 100) if total_projected > 0 else 0
+            members_paid_up = sum(1 for member in db_members if sum(payment.amount for payment in member.payments) >= member.dues_amount)
+            members_outstanding = len(db_members) - members_paid_up
+            
+            dues_summary = {
+                'total_collected': total_collected,
+                'total_projected': total_projected,
+                'outstanding': outstanding,
+                'collection_rate': collection_rate,
+                'members_paid_up': members_paid_up,
+                'members_outstanding': members_outstanding
+            }
+            
+        elif treasurer_app:
+            # JSON mode
+            print("🔍 Using JSON mode for dues summary")
+            dues_summary = treasurer_app.get_dues_collection_summary()
+            members = treasurer_app.members
+        else:
+            print("❌ No data source available")
+            dues_summary = {'total_collected': 0.0, 'total_projected': 0.0, 'outstanding': 0.0, 'collection_rate': 0.0, 'members_paid_up': 0, 'members_outstanding': 0}
+            members = {}
+            
         print(f"🔍 Dues summary loaded: {dues_summary}")
         return render_template('dues_summary.html',
                              dues_summary=dues_summary,
-                             members=treasurer_app.members)
+                             members=members)
     except Exception as e:
         print(f"❌ Dues summary error: {e}")
         import traceback
@@ -3227,20 +3294,81 @@ def transactions():
 @require_auth
 @require_permission('manage_users')
 def treasurer_setup():
-    if request.method == 'GET':
-        return render_template('treasurer_setup.html', config=treasurer_app.treasurer_config)
-    
-    # POST - Update treasurer configuration
-    config = treasurer_app.treasurer_config
-    config.name = request.form.get('name', '')
-    config.email = request.form.get('email', '')
-    config.phone = request.form.get('phone', '')  # Treasurer's phone for SMS notifications
-    config.smtp_username = request.form.get('smtp_username', '')
-    config.smtp_password = request.form.get('smtp_password', '')
-    
-    treasurer_app.save_treasurer_config()
-    flash('Treasurer configuration updated successfully!')
-    return redirect(url_for('treasurer_setup'))
+    try:
+        print(f"🔍 Treasurer setup route called, USE_DATABASE={USE_DATABASE}")
+        
+        if request.method == 'GET':
+            if USE_DATABASE:
+                # Database mode - get config from SQLAlchemy models
+                from models import TreasurerConfig
+                print("🔍 Using database mode for treasurer setup")
+                
+                config = TreasurerConfig.query.first()
+                if not config:
+                    # Create default config if none exists
+                    config = TreasurerConfig()
+                    db.session.add(config)
+                    db.session.commit()
+                    
+            elif treasurer_app:
+                # JSON mode
+                print("🔍 Using JSON mode for treasurer setup")
+                config = treasurer_app.treasurer_config
+            else:
+                print("❌ No data source available")
+                # Create a mock config for display
+                from dataclasses import dataclass
+                @dataclass
+                class MockConfig:
+                    name: str = ''
+                    email: str = ''
+                    phone: str = ''
+                    smtp_username: str = ''
+                    smtp_password: str = ''
+                config = MockConfig()
+                
+            return render_template('treasurer_setup.html', config=config)
+        
+        # POST - Update treasurer configuration
+        if USE_DATABASE:
+            # Database mode
+            from models import TreasurerConfig
+            config = TreasurerConfig.query.first()
+            if not config:
+                config = TreasurerConfig()
+                db.session.add(config)
+            
+            config.name = request.form.get('name', '')
+            config.email = request.form.get('email', '')
+            config.phone = request.form.get('phone', '')
+            config.smtp_username = request.form.get('smtp_username', '')
+            config.smtp_password = request.form.get('smtp_password', '')
+            
+            db.session.commit()
+            
+        elif treasurer_app:
+            # JSON mode
+            config = treasurer_app.treasurer_config
+            config.name = request.form.get('name', '')
+            config.email = request.form.get('email', '')
+            config.phone = request.form.get('phone', '')  # Treasurer's phone for SMS notifications
+            config.smtp_username = request.form.get('smtp_username', '')
+            config.smtp_password = request.form.get('smtp_password', '')
+            
+            treasurer_app.save_treasurer_config()
+        else:
+            flash('Configuration cannot be saved - no data source available', 'error')
+            return redirect(url_for('dashboard'))
+        
+        flash('Treasurer configuration updated successfully!')
+        return redirect(url_for('treasurer_setup'))
+        
+    except Exception as e:
+        print(f"❌ Treasurer setup error: {e}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        flash(f'Error in treasurer setup: {str(e)}', 'error')
+        return redirect(url_for('dashboard'))
 
 @app.route('/handover_treasurer', methods=['GET', 'POST'])
 @require_auth
@@ -3288,17 +3416,33 @@ def optimize_storage():
 @require_permission('manage_users')
 def semester_management():
     try:
-        print(f"🔍 Semester management route called")
+        print(f"🔍 Semester management route called, USE_DATABASE={USE_DATABASE}")
         if request.method == 'GET':
-            if not treasurer_app:
-                print(f"❌ Treasurer app is None")
-                flash('Application not properly initialized', 'error')
-                return redirect(url_for('dashboard'))
+            if USE_DATABASE:
+                # Database mode - get semesters from SQLAlchemy models
+                from models import Semester
+                print("🔍 Using database mode for semester management")
                 
-            semesters = list(treasurer_app.semesters.values())
-            semesters.sort(key=lambda s: (s.year, ['Spring', 'Summer', 'Fall'].index(s.season)), reverse=True)
-            print(f"🔍 Found {len(semesters)} semesters")
-            return render_template('semester_management.html', semesters=semesters, current_semester=treasurer_app.current_semester)
+                db_semesters = Semester.query.all()
+                semesters = db_semesters
+                semesters.sort(key=lambda s: (s.year, ['Spring', 'Summer', 'Fall'].index(s.season)), reverse=True)
+                current_semester = Semester.query.filter_by(is_current=True).first()
+                
+                print(f"🔍 Found {len(semesters)} semesters from database")
+                
+            elif treasurer_app:
+                # JSON mode
+                print("🔍 Using JSON mode for semester management")
+                semesters = list(treasurer_app.semesters.values())
+                semesters.sort(key=lambda s: (s.year, ['Spring', 'Summer', 'Fall'].index(s.season)), reverse=True)
+                current_semester = treasurer_app.current_semester
+                print(f"🔍 Found {len(semesters)} semesters from JSON")
+            else:
+                print("❌ No data source available")
+                semesters = []
+                current_semester = None
+                
+            return render_template('semester_management.html', semesters=semesters, current_semester=current_semester)
     except Exception as e:
         print(f"❌ Semester management error: {e}")
         import traceback
@@ -3503,23 +3647,54 @@ def test_approval_notification():
 def notifications_dashboard():
     """Notifications dashboard for approval requests"""
     try:
-        print(f"🔍 Notifications dashboard route called")
-        if not treasurer_app:
-            print(f"❌ Treasurer app is None")
-            flash('Application not properly initialized', 'error')
-            return redirect(url_for('dashboard'))
-            
-        # Check notification configuration status
-        config = treasurer_app.treasurer_config
-        email_configured = bool(config.smtp_username and config.smtp_password)
-        treasurer_phone_configured = bool(config.phone)
+        print(f"🔍 Notifications dashboard route called, USE_DATABASE={USE_DATABASE}")
         
-        notification_status = {
-            'email_configured': email_configured,
-            'treasurer_phone_configured': treasurer_phone_configured,
-            'email_username': config.smtp_username,
-            'treasurer_phone': config.phone
-        }
+        if USE_DATABASE:
+            # Database mode - get config from SQLAlchemy models
+            from models import TreasurerConfig
+            print("🔍 Using database mode for notifications")
+            
+            config = TreasurerConfig.query.first()
+            if config:
+                email_configured = bool(config.smtp_username and config.smtp_password)
+                treasurer_phone_configured = bool(config.phone)
+                
+                notification_status = {
+                    'email_configured': email_configured,
+                    'treasurer_phone_configured': treasurer_phone_configured,
+                    'email_username': config.smtp_username,
+                    'treasurer_phone': config.phone
+                }
+            else:
+                notification_status = {
+                    'email_configured': False,
+                    'treasurer_phone_configured': False,
+                    'email_username': '',
+                    'treasurer_phone': ''
+                }
+                
+        elif treasurer_app:
+            # JSON mode
+            print("🔍 Using JSON mode for notifications")
+            # Check notification configuration status
+            config = treasurer_app.treasurer_config
+            email_configured = bool(config.smtp_username and config.smtp_password)
+            treasurer_phone_configured = bool(config.phone)
+            
+            notification_status = {
+                'email_configured': email_configured,
+                'treasurer_phone_configured': treasurer_phone_configured,
+                'email_username': config.smtp_username,
+                'treasurer_phone': config.phone
+            }
+        else:
+            print("❌ No data source available")
+            notification_status = {
+                'email_configured': False,
+                'treasurer_phone_configured': False,
+                'email_username': '',
+                'treasurer_phone': ''
+            }
         
         print(f"🔍 Notification status: {notification_status}")
         
@@ -3821,41 +3996,57 @@ def credential_management():
 @require_auth
 @require_permission('manage_users')
 def verify_brothers():
-    """Treasurer interface to verify pending brother registrations (JSON mode only)"""
-    if USE_DATABASE or not treasurer_app:
-        flash('Pending brother verification is managed via the database user admin in this deployment.', 'info')
-        return redirect(url_for('dashboard'))
-    if request.method == 'GET':
-        # Force reload pending brothers from disk
-        treasurer_app.pending_brothers = treasurer_app.load_data(treasurer_app.pending_brothers_file, {})
-        print(f"\n👥 VERIFY BROTHERS PAGE LOAD")
-        print(f"   Pending brothers count: {len(treasurer_app.pending_brothers)}")
+    """Treasurer interface to verify pending brother registrations"""
+    try:
+        print(f"🔍 Verify brothers route called, USE_DATABASE={USE_DATABASE}")
         
-        return render_template('verify_brothers.html',
-                             pending_brothers=treasurer_app.pending_brothers,
-                             members=treasurer_app.members)
-    
-    # POST request - process verification
-    pending_id = request.form.get('pending_id')
-    member_id = request.form.get('member_id')
-    action = request.form.get('action')
-    
-    if action == 'verify' and pending_id and member_id:
-        success, message = treasurer_app.verify_brother_with_member(pending_id, member_id)
-        if success:
-            flash(message, 'success')
-        else:
-            flash(message, 'error')
-    elif action == 'reject' and pending_id:
-        # Remove pending registration
-        if pending_id in treasurer_app.pending_brothers:
-            del treasurer_app.pending_brothers[pending_id]
-            treasurer_app.save_data(treasurer_app.pending_brothers_file, treasurer_app.pending_brothers)
-            flash('Registration rejected and removed.', 'info')
-        else:
-            flash('Registration not found.', 'error')
-    
-    return redirect(url_for('verify_brothers'))
+        if USE_DATABASE:
+            # Database mode - show message about database management
+            flash('In database mode, pending brother verification is handled through the admin interface. Contact system administrator for user management.', 'info')
+            return redirect(url_for('dashboard'))
+        
+        if not treasurer_app:
+            flash('Application not properly initialized for brother verification.', 'error')
+            return redirect(url_for('dashboard'))
+        
+        if request.method == 'GET':
+            # Force reload pending brothers from disk
+            treasurer_app.pending_brothers = treasurer_app.load_data(treasurer_app.pending_brothers_file, {})
+            print(f"\n👥 VERIFY BROTHERS PAGE LOAD")
+            print(f"   Pending brothers count: {len(treasurer_app.pending_brothers)}")
+            
+            return render_template('verify_brothers.html',
+                                 pending_brothers=treasurer_app.pending_brothers,
+                                 members=treasurer_app.members)
+        
+        # POST request - process verification
+        pending_id = request.form.get('pending_id')
+        member_id = request.form.get('member_id')
+        action = request.form.get('action')
+        
+        if action == 'verify' and pending_id and member_id:
+            success, message = treasurer_app.verify_brother_with_member(pending_id, member_id)
+            if success:
+                flash(message, 'success')
+            else:
+                flash(message, 'error')
+        elif action == 'reject' and pending_id:
+            # Remove pending registration
+            if pending_id in treasurer_app.pending_brothers:
+                del treasurer_app.pending_brothers[pending_id]
+                treasurer_app.save_data(treasurer_app.pending_brothers_file, treasurer_app.pending_brothers)
+                flash('Registration rejected and removed.', 'info')
+            else:
+                flash('Registration not found.', 'error')
+        
+        return redirect(url_for('verify_brothers'))
+        
+    except Exception as e:
+        print(f"❌ Verify brothers error: {e}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        flash(f'Error in brother verification: {str(e)}', 'error')
+        return redirect(url_for('dashboard'))
 
 @app.route('/role_management')
 @require_auth
