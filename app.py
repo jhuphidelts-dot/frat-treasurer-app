@@ -2247,8 +2247,22 @@ def change_password():
 @app.route('/monthly_income')
 @require_auth
 def monthly_income():
-    monthly_data = treasurer_app.get_monthly_income_summary()
-    return render_template('monthly_income.html', monthly_data=monthly_data)
+    try:
+        print(f"🔍 Monthly income route called")
+        if not treasurer_app:
+            print(f"❌ Treasurer app is None")
+            flash('Application not properly initialized', 'error')
+            return redirect(url_for('dashboard'))
+        
+        monthly_data = treasurer_app.get_monthly_income_summary()
+        print(f"🔍 Monthly data: {len(monthly_data) if monthly_data else 0} months")
+        return render_template('monthly_income.html', monthly_data=monthly_data)
+    except Exception as e:
+        print(f"❌ Monthly income error: {e}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        flash(f'Error loading monthly income: {str(e)}', 'error')
+        return redirect(url_for('dashboard'))
 
 @app.route('/')
 def landing_page():
@@ -2884,65 +2898,89 @@ def member_details(member_id):
 @require_auth
 @require_permission('manage_budgets')
 def budget_management():
-    if request.method == 'GET':
-        if USE_DATABASE:
-            # Database mode - get budget data
-            from models import BudgetLimit, Transaction, Member
-            
-            # Calculate dues summary
-            members = Member.query.all()
-            total_projected = sum(member.dues_amount for member in members)
-            total_collected = sum(sum(payment.amount for payment in member.payments) for member in members)
-            outstanding = total_projected - total_collected
-            collection_rate = (total_collected / total_projected * 100) if total_projected > 0 else 0
-            
-            dues_summary = {
-                'total_collected': total_collected,
-                'total_projected': total_projected,
-                'outstanding': outstanding,
-                'collection_rate': collection_rate
-            }
-            
-            # Get budget limits
-            budget_limits_data = {}
-            budget_limits = BudgetLimit.query.all()
-            for limit in budget_limits:
-                budget_limits_data[limit.category] = limit.amount
-            
-            # Get budget summary
-            budget_summary = {}
-            for limit in budget_limits:
-                spent = sum(t.amount for t in Transaction.query.filter_by(type='expense', category=limit.category).all())
-                budget_summary[limit.category] = {
-                    'budget_limit': limit.amount,
-                    'spent': spent,
-                    'remaining': limit.amount - spent,
-                    'percent_used': (spent / limit.amount * 100) if limit.amount > 0 else 0
+    try:
+        print(f"🔍 Budget management route called")
+        if request.method == 'GET':
+            if USE_DATABASE:
+                # Database mode - get budget data
+                from models import BudgetLimit, Transaction, Member
+                
+                # Calculate dues summary
+                members = Member.query.all()
+                total_projected = sum(member.dues_amount for member in members)
+                total_collected = sum(sum(payment.amount for payment in member.payments) for member in members)
+                outstanding = total_projected - total_collected
+                collection_rate = (total_collected / total_projected * 100) if total_projected > 0 else 0
+                
+                dues_summary = {
+                    'total_collected': total_collected,
+                    'total_projected': total_projected,
+                    'outstanding': outstanding,
+                    'collection_rate': collection_rate
                 }
+                
+                # Get budget limits
+                budget_limits_data = {}
+                budget_limits = BudgetLimit.query.all()
+                for limit in budget_limits:
+                    budget_limits_data[limit.category] = limit.amount
+                
+                # Get budget summary
+                budget_summary = {}
+                for limit in budget_limits:
+                    spent = sum(t.amount for t in Transaction.query.filter_by(type='expense', category=limit.category).all())
+                    budget_summary[limit.category] = {
+                        'budget_limit': limit.amount,
+                        'spent': spent,
+                        'remaining': limit.amount - spent,
+                        'percent_used': (spent / limit.amount * 100) if limit.amount > 0 else 0
+                    }
+                
+                return render_template('budget_management.html',
+                                     budget_limits=budget_limits_data,
+                                     budget_summary=budget_summary,
+                                     dues_summary=dues_summary,
+                                     categories=BUDGET_CATEGORIES)
+            else:
+                # JSON mode
+                if not treasurer_app:
+                    print(f"❌ Treasurer app is None")
+                    flash('Application not properly initialized', 'error')
+                    return redirect(url_for('dashboard'))
+                    
+                dues_summary = treasurer_app.get_dues_collection_summary()
+                return render_template('budget_management.html',
+                                     budget_limits=treasurer_app.budget_limits,
+                                     budget_summary=treasurer_app.get_budget_summary(),
+                                     dues_summary=dues_summary,
+                                     categories=BUDGET_CATEGORIES)
+    except Exception as e:
+        print(f"❌ Budget management error: {e}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        flash(f'Error loading budget management: {str(e)}', 'error')
+        return redirect(url_for('dashboard'))
+        
+        # POST request - update budget limits
+        if not treasurer_app:
+            print(f"❌ Treasurer app is None in POST")
+            flash('Application not properly initialized', 'error')
+            return redirect(url_for('dashboard'))
             
-            return render_template('budget_management.html',
-                                 budget_limits=budget_limits_data,
-                                 budget_summary=budget_summary,
-                                 dues_summary=dues_summary,
-                                 categories=BUDGET_CATEGORIES)
-        else:
-            # JSON mode
-            dues_summary = treasurer_app.get_dues_collection_summary()
-            return render_template('budget_management.html',
-                                 budget_limits=treasurer_app.budget_limits,
-                                 budget_summary=treasurer_app.get_budget_summary(),
-                                 dues_summary=dues_summary,
-                                 categories=BUDGET_CATEGORIES)
-    
-    # POST request - update budget limits
-    for category in BUDGET_CATEGORIES:
-        amount_key = f'budget_{category.replace("(", "_").replace(")", "_").replace(" ", "_").replace(",", "")}'
-        if amount_key in request.form:
-            amount = float(request.form[amount_key] or 0)
-            treasurer_app.update_budget_limit(category, amount)
-    
-    flash('Budget limits updated successfully!')
-    return redirect(url_for('budget_management'))
+        for category in BUDGET_CATEGORIES:
+            amount_key = f'budget_{category.replace("(", "_").replace(")", "_").replace(" ", "_").replace(",", "")}'
+            if amount_key in request.form:
+                amount = float(request.form[amount_key] or 0)
+                treasurer_app.update_budget_limit(category, amount)
+        
+        flash('Budget limits updated successfully!')
+        return redirect(url_for('budget_management'))
+    except Exception as e:
+        print(f"❌ Budget management POST error: {e}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        flash(f'Error updating budget limits: {str(e)}', 'error')
+        return redirect(url_for('budget_management'))
 
 @app.route('/edit_budget_category/<category>', methods=['GET', 'POST'])
 @require_auth
@@ -3025,10 +3063,24 @@ def custom_payment_schedule(member_id):
 @app.route('/dues_summary')
 @require_auth
 def dues_summary_page():
-    dues_summary = treasurer_app.get_dues_collection_summary()
-    return render_template('dues_summary.html',
-                         dues_summary=dues_summary,
-                         members=treasurer_app.members)
+    try:
+        print(f"🔍 Dues summary route called")
+        if not treasurer_app:
+            print(f"❌ Treasurer app is None")
+            flash('Application not properly initialized', 'error')
+            return redirect(url_for('dashboard'))
+            
+        dues_summary = treasurer_app.get_dues_collection_summary()
+        print(f"🔍 Dues summary loaded: {dues_summary}")
+        return render_template('dues_summary.html',
+                             dues_summary=dues_summary,
+                             members=treasurer_app.members)
+    except Exception as e:
+        print(f"❌ Dues summary error: {e}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        flash(f'Error loading dues summary: {str(e)}', 'error')
+        return redirect(url_for('dashboard'))
 
 # Google Sheets sync functionality removed
 
@@ -3235,31 +3287,56 @@ def optimize_storage():
 @require_auth
 @require_permission('manage_users')
 def semester_management():
-    if request.method == 'GET':
-        semesters = list(treasurer_app.semesters.values())
-        semesters.sort(key=lambda s: (s.year, ['Spring', 'Summer', 'Fall'].index(s.season)), reverse=True)
-        return render_template('semester_management.html', semesters=semesters, current_semester=treasurer_app.current_semester)
-    
-    # POST - Create new semester
-    season = request.form.get('season')
-    year = int(request.form.get('year'))
-    
-    # Archive current semester
-    if treasurer_app.current_semester:
-        treasurer_app.current_semester.is_current = False
-        treasurer_app.current_semester.end_date = datetime.now().isoformat()
-    
-    # Create new semester
-    semester_id = f"{season.lower()}_{year}"
-    new_semester = Semester(id=semester_id, name=f"{season} {year}", year=year, season=season, 
-                           start_date=datetime.now().isoformat(), end_date="", is_current=True)
-    
-    treasurer_app.semesters[semester_id] = new_semester
-    treasurer_app.current_semester = new_semester
-    treasurer_app.save_data(treasurer_app.semesters_file, treasurer_app.semesters)
-    
-    flash(f'New semester {season} {year} created!')
-    return redirect(url_for('semester_management'))
+    try:
+        print(f"🔍 Semester management route called")
+        if request.method == 'GET':
+            if not treasurer_app:
+                print(f"❌ Treasurer app is None")
+                flash('Application not properly initialized', 'error')
+                return redirect(url_for('dashboard'))
+                
+            semesters = list(treasurer_app.semesters.values())
+            semesters.sort(key=lambda s: (s.year, ['Spring', 'Summer', 'Fall'].index(s.season)), reverse=True)
+            print(f"🔍 Found {len(semesters)} semesters")
+            return render_template('semester_management.html', semesters=semesters, current_semester=treasurer_app.current_semester)
+    except Exception as e:
+        print(f"❌ Semester management error: {e}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        flash(f'Error loading semester management: {str(e)}', 'error')
+        return redirect(url_for('dashboard'))
+        
+        # POST - Create new semester
+        if not treasurer_app:
+            print(f"❌ Treasurer app is None in POST")
+            flash('Application not properly initialized', 'error')
+            return redirect(url_for('dashboard'))
+            
+        season = request.form.get('season')
+        year = int(request.form.get('year'))
+        
+        # Archive current semester
+        if treasurer_app.current_semester:
+            treasurer_app.current_semester.is_current = False
+            treasurer_app.current_semester.end_date = datetime.now().isoformat()
+        
+        # Create new semester
+        semester_id = f"{season.lower()}_{year}"
+        new_semester = Semester(id=semester_id, name=f"{season} {year}", year=year, season=season, 
+                               start_date=datetime.now().isoformat(), end_date="", is_current=True)
+        
+        treasurer_app.semesters[semester_id] = new_semester
+        treasurer_app.current_semester = new_semester
+        treasurer_app.save_data(treasurer_app.semesters_file, treasurer_app.semesters)
+        
+        flash(f'New semester {season} {year} created!')
+        return redirect(url_for('semester_management'))
+    except Exception as e:
+        print(f"❌ Semester management POST error: {e}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        flash(f'Error creating semester: {str(e)}', 'error')
+        return redirect(url_for('semester_management'))
 
 # Google Sheets export functionality removed
 
@@ -3425,24 +3502,39 @@ def test_approval_notification():
 @require_permission('send_reminders')
 def notifications_dashboard():
     """Notifications dashboard for approval requests"""
-    # Check notification configuration status
-    config = treasurer_app.treasurer_config
-    email_configured = bool(config.smtp_username and config.smtp_password)
-    treasurer_phone_configured = bool(config.phone)
-    
-    notification_status = {
-        'email_configured': email_configured,
-        'treasurer_phone_configured': treasurer_phone_configured,
-        'email_username': config.smtp_username,
-        'treasurer_phone': config.phone
-    }
-    
-    # TODO: In the future, you could add pending approval requests here
-    # For example:
-    # pending_requests = get_pending_approval_requests()
-    
-    return render_template('notifications_dashboard.html',
-                         notification_status=notification_status)
+    try:
+        print(f"🔍 Notifications dashboard route called")
+        if not treasurer_app:
+            print(f"❌ Treasurer app is None")
+            flash('Application not properly initialized', 'error')
+            return redirect(url_for('dashboard'))
+            
+        # Check notification configuration status
+        config = treasurer_app.treasurer_config
+        email_configured = bool(config.smtp_username and config.smtp_password)
+        treasurer_phone_configured = bool(config.phone)
+        
+        notification_status = {
+            'email_configured': email_configured,
+            'treasurer_phone_configured': treasurer_phone_configured,
+            'email_username': config.smtp_username,
+            'treasurer_phone': config.phone
+        }
+        
+        print(f"🔍 Notification status: {notification_status}")
+        
+        # TODO: In the future, you could add pending approval requests here
+        # For example:
+        # pending_requests = get_pending_approval_requests()
+        
+        return render_template('notifications_dashboard.html',
+                             notification_status=notification_status)
+    except Exception as e:
+        print(f"❌ Notifications dashboard error: {e}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        flash(f'Error loading notifications dashboard: {str(e)}', 'error')
+        return redirect(url_for('dashboard'))
 
 @app.route('/register', methods=['GET', 'POST'])
 def brother_registration():
