@@ -2633,7 +2633,7 @@ def remove_payment(payment_id):
             try:
                 # Find the payment in member records and remove it
                 payment_found = False
-                for member_id, member in treasurer_app.members.items():
+                for member_uuid, member in treasurer_app.members.items():
                     for i, payment in enumerate(member.payments_made):
                         if payment.get('id') == payment_id:
                             member_name = member.name
@@ -2647,9 +2647,22 @@ def remove_payment(payment_id):
                         break
                 
                 if not payment_found:
+                    # Also check if it's a transaction ID that needs to be removed
+                    for transaction in treasurer_app.transactions:
+                        if transaction.id == payment_id:
+                            if treasurer_app.remove_transaction(payment_id):
+                                flash(f'Transaction "{transaction.description}" removed successfully!', 'success')
+                                payment_found = True
+                            else:
+                                flash('Error removing transaction!', 'error')
+                            break
+                
+                if not payment_found:
                     flash('Payment not found!', 'error')
             except Exception as e:
                 print(f"❌ Error deleting payment in JSON mode: {e}")
+                import traceback
+                print(f"❌ Traceback: {traceback.format_exc()}")
                 flash(f'Error deleting payment: {e}', 'error')
         else:
             flash('Application not properly initialized', 'error')
@@ -2916,6 +2929,8 @@ def remove_member(member_id):
 @app.route('/member_details/<member_id>')
 @require_auth
 def member_details(member_id):
+    from datetime import datetime, timedelta
+    
     if USE_DATABASE:
         # Database mode
         from models import Member as DBMember, Payment
@@ -2934,7 +2949,6 @@ def member_details(member_id):
             payment_schedule = []
             if member.payment_plan == 'monthly':
                 # Generate 4 monthly payments
-                from datetime import datetime, timedelta
                 start_date = datetime.now()
                 monthly_amount = member.dues_amount / 4
                 for i in range(4):
@@ -2944,7 +2958,7 @@ def member_details(member_id):
                     # Check if this payment period is paid
                     period_paid = 0
                     for payment in member.payments:
-                        if payment.date.month == due_date.month:
+                        if hasattr(payment.date, 'month') and payment.date.month == due_date.month:
                             period_paid += payment.amount
                     
                     status = 'paid' if period_paid >= monthly_amount else 'pending'
@@ -2966,6 +2980,32 @@ def member_details(member_id):
                     'status': status,
                     'amount_due': max(0, member.dues_amount - total_paid)
                 })
+            elif member.payment_plan == 'bimonthly':
+                # Generate 2 bi-monthly payments
+                start_date = datetime.now()
+                bimonthly_amount = member.dues_amount / 2
+                for i in range(2):
+                    due_date = start_date.replace(day=1) + timedelta(days=60*i)
+                    due_date = due_date.replace(day=1)
+                    
+                    # Check if this payment period is paid
+                    period_paid = 0
+                    for payment in member.payments:
+                        if hasattr(payment.date, 'month'):
+                            # Check if payment falls in this bi-monthly period
+                            if i == 0 and payment.date.month in [start_date.month, start_date.month + 1]:
+                                period_paid += payment.amount
+                            elif i == 1 and payment.date.month in [start_date.month + 2, start_date.month + 3]:
+                                period_paid += payment.amount
+                    
+                    status = 'paid' if period_paid >= bimonthly_amount else 'pending'
+                    payment_schedule.append({
+                        'due_date': due_date.isoformat(),
+                        'amount': bimonthly_amount,
+                        'description': f'Bi-monthly payment {i+1}/2',
+                        'status': status,
+                        'amount_due': max(0, bimonthly_amount - period_paid)
+                    })
             
             return render_template('member_details.html',
                                  member=member,
