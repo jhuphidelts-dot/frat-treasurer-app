@@ -2510,14 +2510,45 @@ def edit_transaction(transaction_id):
 @require_auth
 @require_permission('edit_transactions')
 def remove_transaction(transaction_id):
-    transaction = treasurer_app.get_transaction_by_id(transaction_id)
-    if transaction:
-        if treasurer_app.remove_transaction(transaction_id):
-            flash(f'Transaction "{transaction.description}" removed successfully!')
-        else:
-            flash('Error removing transaction!')
+    print(f"🗑️ Attempting to remove transaction: {transaction_id}")
+    
+    if USE_DATABASE:
+        # Database mode - delete from SQLAlchemy
+        from models import Transaction as DBTransaction, db
+        try:
+            transaction = DBTransaction.query.get_or_404(int(transaction_id))
+            description = transaction.description
+            
+            db.session.delete(transaction)
+            db.session.commit()
+            
+            flash(f'Transaction "{description}" deleted successfully!', 'success')
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ Database transaction deletion failed: {e}")
+            import traceback
+            print(f"❌ Traceback: {traceback.format_exc()}")
+            flash(f'Error deleting transaction: {e}', 'error')
+    elif treasurer_app:
+        # JSON mode - use treasurer_app
+        try:
+            transaction = treasurer_app.get_transaction_by_id(transaction_id)
+            if transaction:
+                print(f"🔍 Found transaction: {transaction.description} (${transaction.amount})")
+                if treasurer_app.remove_transaction(transaction_id):
+                    flash(f'Transaction "{transaction.description}" removed successfully!', 'success')
+                else:
+                    flash('Error removing transaction!', 'error')
+            else:
+                print(f"❌ Transaction not found: {transaction_id}")
+                flash('Transaction not found!', 'error')
+        except Exception as e:
+            print(f"❌ Error removing transaction: {e}")
+            import traceback
+            print(f"❌ Traceback: {traceback.format_exc()}")
+            flash(f'Error removing transaction: {e}', 'error')
     else:
-        flash('Transaction not found!')
+        flash('Application not properly initialized', 'error')
     
     return redirect(url_for('transactions'))
 
@@ -3021,8 +3052,27 @@ def member_details(member_id):
         # JSON mode
         if treasurer_app and member_id in treasurer_app.members:
             member = treasurer_app.members[member_id]
-            payment_schedule = treasurer_app.get_member_payment_schedule(member_id)
             balance = treasurer_app.get_member_balance(member_id)
+            
+            # Get payment schedule - if empty or custom, generate one
+            payment_schedule = treasurer_app.get_member_payment_schedule(member_id)
+            
+            # If no schedule or empty schedule, generate based on payment plan
+            if not payment_schedule or len(payment_schedule) == 0:
+                print(f"🔧 Generating payment schedule for {member.name} with plan: {member.payment_plan}")
+                
+                # Force regenerate schedule if it's empty
+                if member.payment_plan == 'custom' and len(member.custom_schedule) == 0:
+                    # Default custom members to semester plan
+                    member.payment_plan = 'semester'
+                
+                # Regenerate the custom schedule
+                treasurer_app.generate_payment_schedule(member_id)
+                treasurer_app.save_data(treasurer_app.members_file, treasurer_app.members)
+                
+                # Get the updated schedule
+                payment_schedule = treasurer_app.get_member_payment_schedule(member_id)
+                print(f"✅ Generated {len(payment_schedule)} payment schedule items")
             
             return render_template('member_details.html',
                                  member=member,
