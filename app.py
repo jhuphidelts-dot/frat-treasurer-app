@@ -2623,9 +2623,36 @@ def remove_payment(payment_id):
             
         except Exception as e:
             db.session.rollback()
+            print(f"❌ Error deleting payment: {e}")
+            import traceback
+            print(f"❌ Traceback: {traceback.format_exc()}")
             flash(f'Error deleting payment: {e}', 'error')
     else:
-        flash('Payment deletion not available in JSON mode', 'error')
+        # JSON mode - remove payment from member's payments_made list
+        if treasurer_app:
+            try:
+                # Find the payment in member records and remove it
+                payment_found = False
+                for member_id, member in treasurer_app.members.items():
+                    for i, payment in enumerate(member.payments_made):
+                        if payment.get('id') == payment_id:
+                            member_name = member.name
+                            amount = payment['amount']
+                            del member.payments_made[i]
+                            treasurer_app.save_data(treasurer_app.members_file, treasurer_app.members)
+                            payment_found = True
+                            flash(f'Payment of ${amount} from {member_name} deleted successfully!', 'success')
+                            break
+                    if payment_found:
+                        break
+                
+                if not payment_found:
+                    flash('Payment not found!', 'error')
+            except Exception as e:
+                print(f"❌ Error deleting payment in JSON mode: {e}")
+                flash(f'Error deleting payment: {e}', 'error')
+        else:
+            flash('Application not properly initialized', 'error')
     
     return redirect(url_for('transactions'))
 
@@ -2891,22 +2918,65 @@ def remove_member(member_id):
 def member_details(member_id):
     if USE_DATABASE:
         # Database mode
-        member = DBMember.query.get(member_id)
-        if not member:
-            flash('Member not found!')
+        from models import Member as DBMember, Payment
+        
+        try:
+            member = DBMember.query.get(int(member_id))
+            if not member:
+                flash('Member not found!', 'error')
+                return redirect(url_for('dashboard'))
+            
+            # Calculate balance from payments
+            total_paid = sum(payment.amount for payment in member.payments)
+            balance = member.dues_amount - total_paid
+            
+            # Generate payment schedule based on payment plan
+            payment_schedule = []
+            if member.payment_plan == 'monthly':
+                # Generate 4 monthly payments
+                from datetime import datetime, timedelta
+                start_date = datetime.now()
+                monthly_amount = member.dues_amount / 4
+                for i in range(4):
+                    due_date = start_date.replace(day=1) + timedelta(days=32*i)
+                    due_date = due_date.replace(day=1)
+                    
+                    # Check if this payment period is paid
+                    period_paid = 0
+                    for payment in member.payments:
+                        if payment.date.month == due_date.month:
+                            period_paid += payment.amount
+                    
+                    status = 'paid' if period_paid >= monthly_amount else 'pending'
+                    payment_schedule.append({
+                        'due_date': due_date.isoformat(),
+                        'amount': monthly_amount,
+                        'description': f'Monthly payment {i+1}/4',
+                        'status': status,
+                        'amount_due': max(0, monthly_amount - period_paid)
+                    })
+            elif member.payment_plan == 'semester':
+                # Single payment for full semester
+                start_date = datetime.now()
+                status = 'paid' if total_paid >= member.dues_amount else 'pending'
+                payment_schedule.append({
+                    'due_date': start_date.isoformat(),
+                    'amount': member.dues_amount,
+                    'description': 'Full semester payment',
+                    'status': status,
+                    'amount_due': max(0, member.dues_amount - total_paid)
+                })
+            
+            return render_template('member_details.html',
+                                 member=member,
+                                 payment_schedule=payment_schedule,
+                                 balance=balance)
+        except Exception as e:
+            print(f"❌ Error loading member details: {e}")
+            import traceback
+            print(f"❌ Traceback: {traceback.format_exc()}")
+            flash(f'Error loading member details: {e}', 'error')
             return redirect(url_for('dashboard'))
-        
-        # Calculate balance from payments
-        total_paid = sum(payment.amount for payment in member.payments)
-        balance = member.dues_amount - total_paid
-        
-        # Mock payment schedule for now - TODO: implement proper schedule logic
-        payment_schedule = []
-        
-        return render_template('member_details.html',
-                             member=member,
-                             payment_schedule=payment_schedule,
-                             balance=balance)
     else:
         # JSON mode
         if treasurer_app and member_id in treasurer_app.members:
@@ -2919,7 +2989,7 @@ def member_details(member_id):
                                  payment_schedule=payment_schedule,
                                  balance=balance)
         else:
-            flash('Member not found!')
+            flash('Member not found!', 'error')
             return redirect(url_for('dashboard'))
 
 @app.route('/budget_management', methods=['GET', 'POST'])
