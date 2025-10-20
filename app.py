@@ -2651,6 +2651,7 @@ def remove_payment(payment_id):
             db.session.commit()
             
             flash(f'Payment of ${amount} from {member_name} deleted successfully!', 'success')
+            print(f"✅ Payment deleted from database: ${amount} from {member_name}")
             
         except Exception as e:
             db.session.rollback()
@@ -2975,6 +2976,20 @@ def member_details(member_id):
             # Calculate balance from payments
             total_paid = sum(payment.amount for payment in member.payments)
             balance = member.dues_amount - total_paid
+            
+            # Format payments for template (database mode uses different structure)
+            formatted_payments = []
+            for payment in member.payments:
+                formatted_payments.append({
+                    'id': payment.id,
+                    'amount': payment.amount,
+                    'method': payment.payment_method,
+                    'date': payment.date.strftime('%Y-%m-%d') if hasattr(payment.date, 'strftime') else str(payment.date)
+                })
+            
+            # Add payments_made attribute for template compatibility
+            member.payments_made = formatted_payments
+            member.phone = member.contact  # Template expects 'phone' attribute
             
             # Generate payment schedule based on payment plan
             payment_schedule = []
@@ -4161,9 +4176,72 @@ def verify_brothers():
         print(f"🔍 Verify brothers route called, USE_DATABASE={USE_DATABASE}")
         
         if USE_DATABASE:
-            # Database mode - show message about database management
-            flash('In database mode, pending brother verification is handled through the admin interface. Contact system administrator for user management.', 'info')
-            return redirect(url_for('dashboard'))
+            # Database mode - handle pending user approvals
+            from models import User
+            print("🔍 Using database mode for brother verification")
+            
+            if request.method == 'GET':
+                # Get pending users (status='pending')
+                pending_users = User.query.filter_by(status='pending').all()
+                # Get all members to link with
+                from models import Member as MemberModel
+                members = MemberModel.query.all()
+                
+                print(f"👥 Found {len(pending_users)} pending users")
+                
+                return render_template('verify_brothers_db.html',
+                                     pending_users=pending_users,
+                                     members=members)
+            
+            # POST request - handle approval/rejection
+            user_id = request.form.get('user_id')
+            member_id = request.form.get('member_id')
+            action = request.form.get('action')
+            
+            if action == 'approve' and user_id:
+                user = User.query.get(user_id)
+                if user:
+                    user.status = 'active'
+                    user.approved_at = datetime.utcnow()
+                    
+                    # Link to member if specified
+                    if member_id:
+                        from models import Member as MemberModel
+                        member = MemberModel.query.get(member_id)
+                        if member:
+                            member.user_id = user.id
+                    
+                    # Assign brother role
+                    from models import Role
+                    brother_role = Role.query.filter_by(name='brother').first()
+                    if brother_role and brother_role not in user.roles:
+                        user.roles.append(brother_role)
+                    
+                    db.session.commit()
+                    
+                    # Send SMS credentials if configured
+                    config = None
+                    if treasurer_app and hasattr(treasurer_app, 'treasurer_config'):
+                        config = treasurer_app.treasurer_config
+                    
+                    if config and config.smtp_username and user.phone:
+                        password_msg = f"Welcome to the fraternity app! Login: {user.phone} | Password: (same as registration)"
+                        send_email_to_sms(user.phone, password_msg, config)
+                    
+                    flash(f'User {user.full_name} approved and activated!', 'success')
+                else:
+                    flash('User not found!', 'error')
+            
+            elif action == 'reject' and user_id:
+                user = User.query.get(user_id)
+                if user:
+                    db.session.delete(user)
+                    db.session.commit()
+                    flash(f'User {user.full_name} rejected and removed.', 'info')
+                else:
+                    flash('User not found!', 'error')
+            
+            return redirect(url_for('verify_brothers'))
         
         if not treasurer_app:
             flash('Application not properly initialized for brother verification.', 'error')

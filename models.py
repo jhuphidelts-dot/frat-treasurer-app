@@ -175,6 +175,11 @@ class Member(db.Model):
         """Check if member has paid all dues"""
         return self.get_balance() <= 0
     
+    @property
+    def full_name(self):
+        """Get member's full name for compatibility with templates"""
+        return self.name
+    
     def __repr__(self):
         return f'<Member {self.name}>'
 

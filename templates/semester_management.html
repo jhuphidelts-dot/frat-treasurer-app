@@ -69,7 +69,11 @@
                                 </div>
                                 <small class="text-muted">
                                     {% if semester.start_date %}
-                                        {{ semester.start_date[:10] }}
+                                        {% if semester.start_date is string %}
+                                            {{ semester.start_date[:10] }}
+                                        {% else %}
+                                            {{ semester.start_date.strftime('%Y-%m-%d') }}
+                                        {% endif %}
                                     {% endif %}
                                 </small>
                             </div>
