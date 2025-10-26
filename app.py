@@ -2917,31 +2917,137 @@ def confirm_bulk_import():
 @require_auth
 @require_permission('edit_members')
 def edit_member(member_id):
-    if request.method == 'GET':
-        if member_id not in treasurer_app.members:
-            flash('Member not found!')
-            return redirect(url_for('dashboard'))
+    try:
+        if request.method == 'GET':
+            if USE_DATABASE:
+                # Database mode
+                from models import Member as DBMember
+                member = DBMember.query.get(int(member_id))
+                if not member:
+                    flash('Member not found!', 'error')
+                    return redirect(url_for('dashboard'))
+                
+                # Generate payment schedule for display
+                from datetime import datetime, timedelta
+                payment_schedule = []
+                total_paid = sum(p.amount for p in member.payments)
+                
+                if member.payment_plan == 'monthly':
+                    start_date = datetime.now()
+                    monthly_amount = member.dues_amount / 4
+                    for i in range(4):
+                        due_date = start_date.replace(day=1) + timedelta(days=32*i)
+                        due_date = due_date.replace(day=1)
+                        period_paid = sum(p.amount for p in member.payments 
+                                        if hasattr(p.date, 'month') and p.date.month == due_date.month)
+                        status = 'paid' if period_paid >= monthly_amount else 'pending'
+                        payment_schedule.append({
+                            'due_date': due_date.isoformat(),
+                            'amount': monthly_amount,
+                            'description': f'Monthly payment {i+1}/4',
+                            'status': status,
+                            'amount_due': max(0, monthly_amount - period_paid)
+                        })
+                elif member.payment_plan == 'semester':
+                    start_date = datetime.now()
+                    status = 'paid' if total_paid >= member.dues_amount else 'pending'
+                    payment_schedule.append({
+                        'due_date': start_date.isoformat(),
+                        'amount': member.dues_amount,
+                        'description': 'Full semester payment',
+                        'status': status,
+                        'amount_due': max(0, member.dues_amount - total_paid)
+                    })
+                elif member.payment_plan == 'bimonthly':
+                    start_date = datetime.now()
+                    bimonthly_amount = member.dues_amount / 2
+                    for i in range(2):
+                        due_date = start_date.replace(day=1) + timedelta(days=60*i)
+                        due_date = due_date.replace(day=1)
+                        period_paid = 0
+                        for p in member.payments:
+                            if hasattr(p.date, 'month'):
+                                if i == 0 and p.date.month in [start_date.month, start_date.month + 1]:
+                                    period_paid += p.amount
+                                elif i == 1 and p.date.month in [start_date.month + 2, start_date.month + 3]:
+                                    period_paid += p.amount
+                        status = 'paid' if period_paid >= bimonthly_amount else 'pending'
+                        payment_schedule.append({
+                            'due_date': due_date.isoformat(),
+                            'amount': bimonthly_amount,
+                            'description': f'Bi-monthly payment {i+1}/2',
+                            'status': status,
+                            'amount_due': max(0, bimonthly_amount - period_paid)
+                        })
+                
+                return render_template('edit_member.html', 
+                                     member=member,
+                                     payment_schedule=payment_schedule)
+            
+            elif treasurer_app:
+                # JSON mode
+                if member_id not in treasurer_app.members:
+                    flash('Member not found!')
+                    return redirect(url_for('dashboard'))
+                
+                member = treasurer_app.members[member_id]
+                payment_schedule = treasurer_app.get_member_payment_schedule(member_id)
+                
+                return render_template('edit_member.html', 
+                                     member=member,
+                                     payment_schedule=payment_schedule)
+            else:
+                flash('No data source available', 'error')
+                return redirect(url_for('dashboard'))
         
-        member = treasurer_app.members[member_id]
-        payment_schedule = treasurer_app.get_member_payment_schedule(member_id)
+        # POST request - update member
+        name = request.form['name']
+        contact = request.form.get('contact', request.form.get('phone', ''))  # Support both field names
+        dues_amount = float(request.form['dues_amount'])
+        payment_plan = request.form['payment_plan']
+        role = request.form.get('role', 'brother')  # Get role assignment
         
-        return render_template('edit_member.html', 
-                             member=member,
-                             payment_schedule=payment_schedule)
+        if USE_DATABASE:
+            # Database mode
+            from models import Member as DBMember
+            member = DBMember.query.get(int(member_id))
+            if not member:
+                flash('Member not found!', 'error')
+                return redirect(url_for('dashboard'))
+            
+            member.name = name
+            member.contact = contact
+            member.dues_amount = dues_amount
+            member.payment_plan = payment_plan
+            member.role = role
+            
+            try:
+                db.session.commit()
+                flash(f'Member {name} updated successfully!')
+                print(f"✅ Member {name} updated successfully in database")
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error updating member: {e}', 'error')
+                print(f"❌ Error updating member: {e}")
+                return redirect(url_for('dashboard'))
+        
+        elif treasurer_app:
+            # JSON mode
+            if treasurer_app.update_member(member_id, name, contact, dues_amount, payment_plan, role=role):
+                flash(f'Member {name} updated successfully!')
+            else:
+                flash('Error updating member!')
+        else:
+            flash('No data source available', 'error')
+        
+        return redirect(url_for('member_details', member_id=member_id))
     
-    # POST request - update member
-    name = request.form['name']
-    contact = request.form.get('contact', request.form.get('phone', ''))  # Support both field names
-    dues_amount = float(request.form['dues_amount'])
-    payment_plan = request.form['payment_plan']
-    role = request.form.get('role', 'brother')  # Get role assignment
-    
-    if treasurer_app.update_member(member_id, name, contact, dues_amount, payment_plan, role=role):
-        flash(f'Member {name} updated successfully!')
-    else:
-        flash('Error updating member!')
-    
-    return redirect(url_for('member_details', member_id=member_id))
+    except Exception as e:
+        print(f"❌ Edit member error: {e}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        flash(f'Error editing member: {str(e)}', 'error')
+        return redirect(url_for('dashboard'))
 
 @app.route('/remove_member/<member_id>', methods=['POST'])
 @require_auth
