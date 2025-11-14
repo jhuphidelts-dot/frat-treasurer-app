@@ -2468,95 +2468,8 @@ def assign_role():
 @require_auth
 @require_permission('assign_roles')
 def change_role():
-    """Change a member's role"""
-    member_id = request.form.get('member_id')
-    new_role = request.form.get('role')
-    
-    if not member_id or not new_role:
-        flash('Member and role must be specified.', 'error')
-        return redirect(url_for('role_management'))
-    
-    # TODO: Implement database version
-    # if member_id not in treasurer_app.members:
-        flash('Member not found.', 'error')
-        return redirect(url_for('role_management'))
-    
-    # Check if new role is already taken (except for brother role)
-    if new_role != 'brother':
-        # TODO: Implement database version
-        # for existing_id, existing_member in treasurer_app.members.items():
-        if hasattr(existing_member, 'role') and existing_member.role == new_role and existing_id != member_id:
-                flash(f'{new_role.replace("_", " ").title()} position is already filled by {existing_member.name}.', 'warning')
-                return redirect(url_for('role_management'))
-    
-    # Update member role in JSON system
-    # TODO: Implement database version
-    # member = treasurer_app.members[member_id]
-    old_role = member.role if hasattr(member, 'role') and member.role else 'brother'
-    member.role = new_role
-    
-    # Also update in SQLAlchemy system if user account exists
-    try:
-        from models import db, User, Role
-        if hasattr(member, 'user_id') and member.user_id:
-            user = User.query.get(member.user_id)
-        if user:
-                # Clear existing roles (except admin which should be preserved)
-                user.roles = [r for r in user.roles if r.name == 'admin']
-                
-                # Add new role
-                if new_role != 'brother':  # brother is default, no explicit role needed
-                    role_obj = Role.query.filter_by(name=new_role).first()
-                    if not role_obj:
-                        # Create role if it doesn't exist
-                        role_obj = Role(name=new_role, description=f'{new_role.replace("_", " ").title()} role')
-                        db.session.add(role_obj)
-                    user.roles.append(role_obj)
-                
-                # Always ensure brother role exists as base
-                brother_role = Role.query.filter_by(name='brother').first()
-                if not brother_role:
-                    brother_role = Role(name='brother', description='Brother role')
-                    db.session.add(brother_role)
-                if brother_role not in user.roles:
-                    user.roles.append(brother_role)
-                
-                db.session.commit()
-                print(f"Updated SQLAlchemy roles for user {user.full_name}: {[r.name for r in user.roles]}")
-    except Exception as e:
-        print(f"SQLAlchemy role update failed (continuing with JSON): {e}")
-        # Continue with JSON-only update if SQLAlchemy fails
-    
-    # Save JSON changes
-    try:
-        # TODO: Implement database version
-        # treasurer_app.save_data(treasurer_app.members_file, treasurer_app.members)
-        print(f"✅ Successfully saved role change: {member.name} {old_role} -> {new_role}")
-        
-        # Force reload the members data to ensure consistency
-        # TODO: Implement database version
-        # treasurer_app.members = treasurer_app.load_data(treasurer_app.members_file, {})
-        print(f"✅ Reloaded member data from disk")
-        
-    except Exception as e:
-        print(f"❌ Failed to save member data: {e}")
-        flash(f'Error saving role change: {e}', 'error')
-        return redirect(url_for('role_management'))
-    
-    # Verify the change was saved
-    # TODO: Implement database version
-    # updated_members = treasurer_app.load_data(treasurer_app.members_file, {})
-    updated_member = updated_members.get(member_id)
-    if updated_member:
-        updated_role = updated_member.get('role') if isinstance(updated_member, dict) else getattr(updated_member, 'role', 'brother')
-        print(f"✅ Verification: {member.name} role is now {updated_role}")
-    
-    if new_role == old_role:
-        flash(f'{member.name} role unchanged.', 'info')
-    else:
-        flash(f'{member.name} role changed from {old_role.replace("_", " ").title()} to {new_role.replace("_", " ").title()}.', 'success')
-    
-    return redirect(url_for('role_management'))
+    """Change a member's role - delegates to assign_role"""
+    return assign_role()
 
 @app.route('/ai_assistant', methods=['GET', 'POST'])
 @require_auth
@@ -2667,13 +2580,9 @@ def chair_budget_management():
         accessible = can_view_all_budgets or (user_chair_type == chair_type)
         
         if accessible:
-            # Get budget data for this chair category
-                # Database mode - get data from SQLAlchemy models
-                budget_data = get_chair_budget_data_db(chair_type)
-        else:
-                # Fallback data
-                budget_data = get_mock_chair_budget_data(chair_type)
-        
+            # Get budget data for this chair category (database mode)
+            budget_data = get_chair_budget_data_db(chair_type)
+            
             chair_budgets[chair_type] = {
                 'display_name': display_name,
                 'accessible': True,
@@ -2698,58 +2607,6 @@ def get_chair_budget_data_db(chair_type):
     # TODO: Implement database queries for chair budget data
     return get_mock_chair_budget_data(chair_type)
 
-def get_chair_budget_data_json(chair_type):
-    """Get chair budget data from JSON files"""
-    if not treasurer_app:
-        return get_mock_chair_budget_data(chair_type)
-    
-    # Map chair types to budget categories
-    category_mapping = {
-        'social': 'Social',
-        'phi_ed': 'Phi ED',
-        'brotherhood': 'Brotherhood', 
-        'recruitment': 'Recruitment'
-    }
-    
-    category = category_mapping.get(chair_type, chair_type.title())
-    
-    # Get budget limit
-    # TODO: Implement database version
-    # budget_limit = treasurer_app.budget_limits.get(category, 0.0)
-    
-    # Get expenses for this category
-    expenses = []
-    total_spent = 0.0
-    
-    # TODO: Implement database version
-    # for transaction in treasurer_app.transactions:
-        if hasattr(transaction, 'category') and transaction.category == category:
-        if transaction.type == 'expense':
-                expenses.append({
-                    'date': transaction.date,
-                    'description': transaction.description,
-                    'category': transaction.category,
-                    'amount': transaction.amount,
-                    'status': 'completed',
-                    'notes': ''
-                })
-                total_spent += transaction.amount
-    
-    # Calculate remaining budget
-    remaining = budget_limit - total_spent
-    usage_percentage = (total_spent / budget_limit * 100) if budget_limit > 0 else 0
-    
-    return {
-        'budget_limit': budget_limit,
-        'total_spent': total_spent,
-        'pending_amount': 0.0,  # TODO: Get from pending reimbursements
-        'remaining': remaining,
-        'usage_percentage': min(usage_percentage, 100),
-        'expenses_count': len(expenses),
-        'spending_plans': [],  # TODO: Get from spending plans
-        'pending_reimbursements': [],  # TODO: Get from reimbursement requests
-        'recent_expenses': expenses[:10]  # Show last 10 expenses
-    }
 
 def get_mock_chair_budget_data(chair_type):
     """Get mock chair budget data for demo/fallback"""
