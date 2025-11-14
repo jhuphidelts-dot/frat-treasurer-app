@@ -540,7 +540,7 @@ def require_auth(f):
         if 'user' not in session:
             flash('Please log in to access this page')
             return redirect(url_for('login'))
-            return f(*args, **kwargs)
+        return f(*args, **kwargs)
     decorated_function.__name__ = f.__name__
     return decorated_function
 
