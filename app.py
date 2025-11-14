@@ -1407,6 +1407,31 @@ def member_details(member_id):
                     'status': status,
                     'amount_due': max(0, bimonthly_amount - period_paid)
                 })
+        elif member.payment_plan == 'custom':
+            # Handle custom payment plan
+            # Check if member has custom_schedule in database
+            if hasattr(member, 'custom_schedule') and member.custom_schedule:
+                # Use stored custom schedule
+                try:
+                    import json
+                    if isinstance(member.custom_schedule, str):
+                        payment_schedule = json.loads(member.custom_schedule)
+                    else:
+                        payment_schedule = member.custom_schedule
+                except:
+                    payment_schedule = []
+            
+            # If no custom schedule or empty, fall back to semester plan
+            if not payment_schedule:
+                start_date = datetime.now()
+                status = 'paid' if total_paid >= member.dues_amount else 'pending'
+                payment_schedule.append({
+                    'due_date': start_date.isoformat(),
+                    'amount': member.dues_amount,
+                    'description': 'Full semester payment (custom schedule not set)',
+                    'status': status,
+                    'amount_due': max(0, member.dues_amount - total_paid)
+                })
         
         return render_template('member_details.html',
                              member=member,
@@ -2605,8 +2630,58 @@ def chair_budget_management():
 
 def get_chair_budget_data_db(chair_type):
     """Get chair budget data from database"""
-    # TODO: Implement database queries for chair budget data
-    return get_mock_chair_budget_data(chair_type)
+    from models import BudgetLimit, Transaction
+    
+    # Map chair types to budget categories
+    category_mapping = {
+        'social': 'Social',
+        'phi_ed': 'Phi ED',
+        'brotherhood': 'Brotherhood',
+        'recruitment': 'Recruitment'
+    }
+    
+    category = category_mapping.get(chair_type, chair_type.title())
+    
+    # Get budget limit from database
+    budget_limit_record = BudgetLimit.query.filter_by(category=category).first()
+    budget_limit = budget_limit_record.amount if budget_limit_record else 0.0
+    
+    # Get all expenses for this category from database
+    expense_transactions = Transaction.query.filter_by(
+        type='expense',
+        category=category
+    ).order_by(Transaction.date.desc()).all()
+    
+    # Calculate total spent
+    total_spent = sum(t.amount for t in expense_transactions)
+    
+    # Format recent expenses for display
+    recent_expenses = []
+    for trans in expense_transactions[:10]:  # Get last 10
+        recent_expenses.append({
+            'date': trans.date.strftime('%Y-%m-%d'),
+            'description': trans.description,
+            'category': trans.category,
+            'amount': trans.amount,
+            'status': 'completed',
+            'notes': getattr(trans, 'notes', '')
+        })
+    
+    # Calculate remaining and usage
+    remaining = budget_limit - total_spent
+    usage_percentage = (total_spent / budget_limit * 100) if budget_limit > 0 else 0
+    
+    return {
+        'budget_limit': budget_limit,
+        'total_spent': total_spent,
+        'pending_amount': 0.0,  # TODO: Get from pending reimbursements if needed
+        'remaining': remaining,
+        'usage_percentage': min(usage_percentage, 100),
+        'expenses_count': len(expense_transactions),
+        'spending_plans': [],  # TODO: Get from spending plans table if needed
+        'pending_reimbursements': [],  # TODO: Get from reimbursement requests if needed
+        'recent_expenses': recent_expenses
+    }
 
 
 def get_mock_chair_budget_data(chair_type):
