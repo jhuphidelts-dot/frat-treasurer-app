@@ -784,15 +784,9 @@ def dashboard():
 @app.route('/enhanced')
 @require_auth
 def enhanced_dashboard():
-    # TODO: Implement database version
-    # dues_summary = treasurer_app.get_dues_collection_summary()
-    return render_template('enhanced_dashboard.html', 
-                         # TODO: Implement database version
-                         # members=treasurer_app.members,
-                         # TODO: Implement database version
-                         # budget_summary=treasurer_app.get_budget_summary(),
-                         dues_summary=dues_summary,
-                         categories=BUDGET_CATEGORIES)
+    # TODO: Implement full enhanced dashboard with database
+    # For now, redirect to main dashboard
+    return redirect(url_for('dashboard'))
 
 @app.route('/add_member', methods=['POST'])
 @require_auth
@@ -847,8 +841,9 @@ def add_transaction():
 @require_auth
 @require_permission('edit_transactions')
 def edit_transaction(transaction_id):
-    # TODO: Implement database version
-    # transaction = treasurer_app.get_transaction_by_id(transaction_id)
+    from models import Transaction as DBTransaction
+    
+    transaction = DBTransaction.query.get(int(transaction_id))
     if not transaction:
         flash('Transaction not found!')
         return redirect(url_for('transactions'))
@@ -859,14 +854,17 @@ def edit_transaction(transaction_id):
                              categories=BUDGET_CATEGORIES + ['Dues Collection'])
     
     # POST request - update transaction
-    category = request.form['category']
-    description = request.form['description']
-    amount = float(request.form['amount'])
-    transaction_type = request.form['type']
-    
-    # TODO: Implement database version
-    # if treasurer_app.update_transaction(transaction_id, category, description, amount, transaction_type):
-    flash('Transaction update not yet implemented!')
+    try:
+        transaction.category = request.form['category']
+        transaction.description = request.form['description']
+        transaction.amount = float(request.form['amount'])
+        transaction.type = request.form['type']
+        
+        db.session.commit()
+        flash('Transaction updated successfully!')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating transaction: {e}', 'error')
     
     return redirect(url_for('transactions'))
 
@@ -915,19 +913,19 @@ def record_payment():
             flash('Member not found!', 'error')
             return redirect(url_for('dashboard'))
         
-            # Create payment record
-            payment = Payment(
+        # Create payment record
+        payment = Payment(
             member_id=int(member_id),
             amount=amount,
             payment_method=payment_method,
             date=datetime.now().date()
-            )
+        )
         
-            db.session.add(payment)
-            db.session.commit()
+        db.session.add(payment)
+        db.session.commit()
         
-            print(f"✅ Payment recorded in database: {member.name} paid ${amount} via {payment_method}")
-            flash('Payment recorded successfully!', 'success')
+        print(f"✅ Payment recorded in database: {member.name} paid ${amount} via {payment_method}")
+        flash('Payment recorded successfully!', 'success')
         
     except Exception as e:
         db.session.rollback()
@@ -2191,11 +2189,12 @@ def brother_dashboard_preview(role_name):
     # Add additional data for executives (handle both database and JSON modes)
     if role_name in ['president', 'vice_president']:
         # Database mode - get data from SQLAlchemy models
+        from models import Member as DBMember
         total_members = DBMember.query.count()
         data.update({
-                'total_members': total_members,
-                'dues_summary': {'total_collected': 5000.0, 'total_projected': 10000.0, 'outstanding': 5000.0, 'collection_rate': 50.0},  # Mock data
-                'budget_summary': {}  # Mock budget data
+            'total_members': total_members,
+            'dues_summary': {'total_collected': 5000.0, 'total_projected': 10000.0, 'outstanding': 5000.0, 'collection_rate': 50.0},  # Mock data
+            'budget_summary': {}  # Mock budget data
         })
     elif role_name in ['social_chair', 'phi_ed_chair', 'brotherhood_chair', 'recruitment_chair']:
         # Database mode - mock budget data for preview
