@@ -718,12 +718,12 @@ def dashboard():
             
             members[str(member.id)] = member
         
-            # Calculate dues summary from database
-            print("🔍 Calculating dues summary...")
-            total_projected = sum(member.dues_amount for member in db_members)
-            total_collected = 0.0
+        # Calculate dues summary from database
+        print("🔍 Calculating dues summary...")
+        total_projected = sum(member.dues_amount for member in db_members)
+        total_collected = 0.0
         
-            # Sum all payments made by all members
+        # Sum all payments made by all members
         for member in db_members:
             try:
                 member_payments = sum(payment.amount for payment in member.payments)
@@ -732,21 +732,21 @@ def dashboard():
             except Exception as e:
                 print(f"⚠️ Error calculating payments for {member.name}: {e}")
         
-            outstanding = total_projected - total_collected
-            collection_rate = (total_collected / total_projected * 100) if total_projected > 0 else 0
+        outstanding = total_projected - total_collected
+        collection_rate = (total_collected / total_projected * 100) if total_projected > 0 else 0
         
-            print(f"🔍 Totals: projected=${total_projected}, collected=${total_collected}, outstanding=${outstanding}")
+        print(f"🔍 Totals: projected=${total_projected}, collected=${total_collected}, outstanding=${outstanding}")
         
-            dues_summary = {
+        dues_summary = {
             'total_collected': total_collected,
             'total_projected': total_projected, 
             'outstanding': outstanding,
             'collection_rate': collection_rate
-            }
+        }
         
-            # Get budget summary from database - format to match template expectations
-            budget_summary = {}
-            budget_limits = BudgetLimit.query.all()
+        # Get budget summary from database - format to match template expectations
+        budget_summary = {}
+        budget_limits = BudgetLimit.query.all()
         
         for limit in budget_limits:
             # Calculate spending for this category
@@ -767,13 +767,13 @@ def dashboard():
                 'amount': spent  # Template might expect 'amount' for spent
             }
         
-            print(f"🔍 Rendering dashboard with {len(members)} members")
-            return render_template('index.html',
-                             members=members,
-                             budget_summary=budget_summary,
-                             dues_summary=dues_summary,
-                             categories=BUDGET_CATEGORIES,
-                             pending_brothers=pending_brothers)
+        print(f"🔍 Rendering dashboard with {len(members)} members")
+        return render_template('index.html',
+                         members=members,
+                         budget_summary=budget_summary,
+                         dues_summary=dues_summary,
+                         categories=BUDGET_CATEGORIES,
+                         pending_brothers=pending_brothers)
     
     except Exception as e:
         print(f"❌ Dashboard error: {e}")
