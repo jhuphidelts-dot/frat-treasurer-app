@@ -1415,10 +1415,22 @@ def member_details(member_id):
                 try:
                     import json
                     if isinstance(member.custom_schedule, str):
-                        payment_schedule = json.loads(member.custom_schedule)
+                        loaded_schedule = json.loads(member.custom_schedule)
                     else:
-                        payment_schedule = member.custom_schedule
-                except:
+                        loaded_schedule = member.custom_schedule
+                    
+                    # Add status and amount_due to each payment in the schedule
+                    for payment_item in loaded_schedule:
+                        # Calculate if this specific payment is paid
+                        payment_amount = float(payment_item.get('amount', 0))
+                        # For custom schedules, we'll mark individual payments as paid if total exceeds them
+                        # This is a simplification - ideally we'd track per-payment status
+                        payment_item['status'] = 'paid' if total_paid >= payment_amount else 'pending'
+                        payment_item['amount_due'] = max(0, payment_amount - min(total_paid, payment_amount))
+                    
+                    payment_schedule = loaded_schedule
+                except Exception as e:
+                    print(f"⚠️ Error parsing custom schedule: {e}")
                     payment_schedule = []
             
             # If no custom schedule or empty, fall back to semester plan
@@ -1558,8 +1570,8 @@ def edit_budget_category(category):
 @require_auth
 @require_permission('edit_members')
 def custom_payment_schedule(member_id):
-    # TODO: Implement database version - this entire function needs database implementation
     from models import Member
+    import json
     
     member = Member.query.get(int(member_id))
     if not member:
@@ -1567,6 +1579,13 @@ def custom_payment_schedule(member_id):
         return redirect(url_for('dashboard'))
     
     if request.method == 'GET':
+        # Parse custom_schedule if it exists (it's stored as JSON string)
+        if member.custom_schedule:
+            try:
+                member.custom_schedule = json.loads(member.custom_schedule) if isinstance(member.custom_schedule, str) else member.custom_schedule
+            except:
+                member.custom_schedule = None
+        
         return render_template('custom_payment_schedule.html',
                              member=member)
     
@@ -1595,7 +1614,9 @@ def custom_payment_schedule(member_id):
         
         # Update member with custom schedule
         member.payment_plan = 'custom'
-        # TODO: Store custom_schedule in database (add custom_schedule JSON field to Member model)
+        # Store custom_schedule in database using the model's method
+        import json
+        member.custom_schedule = json.dumps(custom_schedule)
         db.session.commit()
         
         flash(f'Custom payment schedule updated for {member.full_name}!')
