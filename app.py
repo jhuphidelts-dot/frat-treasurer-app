@@ -666,9 +666,9 @@ def monthly_income():
             monthly_data[month_key]['total_amount'] += payment.amount
             monthly_data[month_key]['transaction_count'] += 1
         
-            print(f"🔍 Monthly data: {len(monthly_data)} months from database")
+        print(f"🔍 Monthly data: {len(monthly_data)} months from database")
         
-            return render_template('monthly_income.html', monthly_data=monthly_data)
+        return render_template('monthly_income.html', monthly_data=monthly_data)
     except Exception as e:
         print(f"❌ Monthly income error: {e}")
         import traceback
@@ -2806,10 +2806,10 @@ def debug_payment_status():
                 } for p in member.payments[:3]]  # First 3 payments
             })
         
-            return {
+        return {
             'member_payment_data': member_data,
             'total_payments_in_db': Payment.query.count()
-            }
+        }
         
     except Exception as e:
         return {'error': str(e)}
@@ -2884,8 +2884,8 @@ def debug_fix_admin_role():
         if not admin_role:
             return {'error': 'Admin role not found - try /debug/fix_roles first'}
         
-            # Check current roles
-            current_roles = [r.name for r in admin_user.roles]
+        # Check current roles
+        current_roles = [r.name for r in admin_user.roles]
         
         if 'admin' not in current_roles:
             admin_user.roles.append(admin_role)
@@ -2918,3 +2918,18 @@ if __name__ == '__main__':
         print("\n🔒 Local hosting permanently disabled for security")
         import sys
         sys.exit(1)
+
+# Add error handlers to show detailed errors in production
+@app.errorhandler(500)
+def internal_error(error):
+    import traceback
+    error_details = traceback.format_exc()
+    print(f"❌ 500 Error: {error_details}")
+    return f"<h1>Internal Server Error</h1><pre>{error_details}</pre>", 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    import traceback
+    error_details = traceback.format_exc()
+    print(f"❌ Unhandled Exception: {error_details}")
+    return f"<h1>Application Error</h1><pre>{error_details}</pre>", 500
