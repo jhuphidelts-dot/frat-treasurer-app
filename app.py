@@ -1231,7 +1231,7 @@ def edit_member(member_id):
                         'status': status,
                         'amount_due': max(0, monthly_amount - period_paid)
                     })
-        elif member.payment_plan == 'semester':
+            elif member.payment_plan == 'semester':
                 start_date = datetime.now()
                 status = 'paid' if total_paid >= member.dues_amount else 'pending'
                 payment_schedule.append({
@@ -1241,7 +1241,7 @@ def edit_member(member_id):
                     'status': status,
                     'amount_due': max(0, member.dues_amount - total_paid)
                 })
-        elif member.payment_plan == 'bimonthly':
+            elif member.payment_plan == 'bimonthly':
                 start_date = datetime.now()
                 bimonthly_amount = member.dues_amount / 2
                 for i in range(2):
@@ -1262,32 +1262,32 @@ def edit_member(member_id):
                         'status': status,
                         'amount_due': max(0, bimonthly_amount - period_paid)
                     })
-        
+            
             return render_template('edit_member.html', 
                                  member=member,
                                  payment_schedule=payment_schedule)
         
-            # POST request - update member
-            name = request.form['name']
-            contact = request.form.get('contact', request.form.get('phone', ''))  # Support both field names
-            dues_amount = float(request.form['dues_amount'])
-            payment_plan = request.form['payment_plan']
-            role = request.form.get('role', 'brother')  # Get role assignment
+        # POST request - update member
+        name = request.form['name']
+        contact = request.form.get('contact', request.form.get('phone', ''))  # Support both field names
+        dues_amount = float(request.form['dues_amount'])
+        payment_plan = request.form['payment_plan']
+        role = request.form.get('role', 'brother')  # Get role assignment
         
-            # Database mode
-            from models import Member as DBMember
-            member = DBMember.query.get(int(member_id))
+        # Database mode
+        from models import Member as DBMember
+        member = DBMember.query.get(int(member_id))
         if not member:
             flash('Member not found!', 'error')
             return redirect(url_for('dashboard'))
         
-            member.name = name
-            member.contact = contact
-            member.dues_amount = dues_amount
-            member.payment_plan = payment_plan
-            member.role = role
+        member.name = name
+        member.contact = contact
+        member.dues_amount = dues_amount
+        member.payment_plan = payment_plan
+        member.role = role
         
-            try:
+        try:
             db.session.commit()
             flash(f'Member {name} updated successfully!')
             print(f"✅ Member {name} updated successfully in database")
@@ -1297,7 +1297,7 @@ def edit_member(member_id):
             print(f"❌ Error updating member: {e}")
             return redirect(url_for('dashboard'))
         
-            return redirect(url_for('member_details', member_id=member_id))
+        return redirect(url_for('member_details', member_id=member_id))
     
     except Exception as e:
         print(f"❌ Edit member error: {e}")
@@ -1310,15 +1310,8 @@ def edit_member(member_id):
 @require_auth
 @require_permission('edit_members')
 def remove_member(member_id):
-    # TODO: Implement database version
-    # if member_id in treasurer_app.members:
-        # TODO: Implement database version
-        # member_name = treasurer_app.members[member_id].name
-        # TODO: Implement database version
-        # if treasurer_app.remove_member(member_id):
-        flash(f'Member {member_name} removed successfully!')
-        else:
-            flash('Error removing member!')
+    # TODO: Implement database version  
+    flash('Member removal not yet implemented!')
     return redirect(url_for('dashboard'))
 
 @app.route('/member_details/<member_id>')
@@ -1326,105 +1319,105 @@ def remove_member(member_id):
 def member_details(member_id):
     from datetime import datetime, timedelta
     
-        # Database mode
-        from models import Member as DBMember, Payment
-        
-        try:
-            member = DBMember.query.get(int(member_id))
+    # Database mode
+    from models import Member as DBMember, Payment
+    
+    try:
+        member = DBMember.query.get(int(member_id))
         if not member:
-                flash('Member not found!', 'error')
-                return redirect(url_for('dashboard'))
-        
-            # Calculate balance from payments
-            total_paid = sum(payment.amount for payment in member.payments)
-            balance = member.dues_amount - total_paid
-        
-            # Format payments for template (database mode uses different structure)
-            formatted_payments = []
-        for payment in member.payments:
-                formatted_payments.append({
-                    'id': payment.id,
-                    'amount': payment.amount,
-                    'method': payment.payment_method,
-                    'date': payment.date.strftime('%Y-%m-%d') if hasattr(payment.date, 'strftime') else str(payment.date)
-                })
-        
-            # Add payments_made attribute for template compatibility
-            member.payments_made = formatted_payments
-            member.phone = member.contact  # Template expects 'phone' attribute
-        
-            # Generate payment schedule based on payment plan
-            payment_schedule = []
-        if member.payment_plan == 'monthly':
-                # Generate 4 monthly payments
-                start_date = datetime.now()
-                monthly_amount = member.dues_amount / 4
-                for i in range(4):
-                    due_date = start_date.replace(day=1) + timedelta(days=32*i)
-                    due_date = due_date.replace(day=1)
-                    
-                    # Check if this payment period is paid
-                    period_paid = 0
-                    for payment in member.payments:
-                        if hasattr(payment.date, 'month') and payment.date.month == due_date.month:
-                            period_paid += payment.amount
-                    
-                    status = 'paid' if period_paid >= monthly_amount else 'pending'
-                    payment_schedule.append({
-                        'due_date': due_date.isoformat(),
-                        'amount': monthly_amount,
-                        'description': f'Monthly payment {i+1}/4',
-                        'status': status,
-                        'amount_due': max(0, monthly_amount - period_paid)
-                    })
-        elif member.payment_plan == 'semester':
-                # Single payment for full semester
-                start_date = datetime.now()
-                status = 'paid' if total_paid >= member.dues_amount else 'pending'
-                payment_schedule.append({
-                    'due_date': start_date.isoformat(),
-                    'amount': member.dues_amount,
-                    'description': 'Full semester payment',
-                    'status': status,
-                    'amount_due': max(0, member.dues_amount - total_paid)
-                })
-        elif member.payment_plan == 'bimonthly':
-                # Generate 2 bi-monthly payments
-                start_date = datetime.now()
-                bimonthly_amount = member.dues_amount / 2
-                for i in range(2):
-                    due_date = start_date.replace(day=1) + timedelta(days=60*i)
-                    due_date = due_date.replace(day=1)
-                    
-                    # Check if this payment period is paid
-                    period_paid = 0
-                    for payment in member.payments:
-                        if hasattr(payment.date, 'month'):
-                            # Check if payment falls in this bi-monthly period
-                            if i == 0 and payment.date.month in [start_date.month, start_date.month + 1]:
-                                period_paid += payment.amount
-                            elif i == 1 and payment.date.month in [start_date.month + 2, start_date.month + 3]:
-                                period_paid += payment.amount
-                    
-                    status = 'paid' if period_paid >= bimonthly_amount else 'pending'
-                    payment_schedule.append({
-                        'due_date': due_date.isoformat(),
-                        'amount': bimonthly_amount,
-                        'description': f'Bi-monthly payment {i+1}/2',
-                        'status': status,
-                        'amount_due': max(0, bimonthly_amount - period_paid)
-                    })
-        
-            return render_template('member_details.html',
-                                 member=member,
-                                 payment_schedule=payment_schedule,
-                                 balance=balance)
-        except Exception as e:
-            print(f"❌ Error loading member details: {e}")
-            import traceback
-            print(f"❌ Traceback: {traceback.format_exc()}")
-            flash(f'Error loading member details: {e}', 'error')
+            flash('Member not found!', 'error')
             return redirect(url_for('dashboard'))
+        
+        # Calculate balance from payments
+        total_paid = sum(payment.amount for payment in member.payments)
+        balance = member.dues_amount - total_paid
+        
+        # Format payments for template (database mode uses different structure)
+        formatted_payments = []
+        for payment in member.payments:
+            formatted_payments.append({
+                'id': payment.id,
+                'amount': payment.amount,
+                'method': payment.payment_method,
+                'date': payment.date.strftime('%Y-%m-%d') if hasattr(payment.date, 'strftime') else str(payment.date)
+            })
+        
+        # Add payments_made attribute for template compatibility
+        member.payments_made = formatted_payments
+        member.phone = member.contact  # Template expects 'phone' attribute
+        
+        # Generate payment schedule based on payment plan
+        payment_schedule = []
+        if member.payment_plan == 'monthly':
+            # Generate 4 monthly payments
+            start_date = datetime.now()
+            monthly_amount = member.dues_amount / 4
+            for i in range(4):
+                due_date = start_date.replace(day=1) + timedelta(days=32*i)
+                due_date = due_date.replace(day=1)
+                
+                # Check if this payment period is paid
+                period_paid = 0
+                for payment in member.payments:
+                    if hasattr(payment.date, 'month') and payment.date.month == due_date.month:
+                        period_paid += payment.amount
+                
+                status = 'paid' if period_paid >= monthly_amount else 'pending'
+                payment_schedule.append({
+                    'due_date': due_date.isoformat(),
+                    'amount': monthly_amount,
+                    'description': f'Monthly payment {i+1}/4',
+                    'status': status,
+                    'amount_due': max(0, monthly_amount - period_paid)
+                })
+        elif member.payment_plan == 'semester':
+            # Single payment for full semester
+            start_date = datetime.now()
+            status = 'paid' if total_paid >= member.dues_amount else 'pending'
+            payment_schedule.append({
+                'due_date': start_date.isoformat(),
+                'amount': member.dues_amount,
+                'description': 'Full semester payment',
+                'status': status,
+                'amount_due': max(0, member.dues_amount - total_paid)
+            })
+        elif member.payment_plan == 'bimonthly':
+            # Generate 2 bi-monthly payments
+            start_date = datetime.now()
+            bimonthly_amount = member.dues_amount / 2
+            for i in range(2):
+                due_date = start_date.replace(day=1) + timedelta(days=60*i)
+                due_date = due_date.replace(day=1)
+                
+                # Check if this payment period is paid
+                period_paid = 0
+                for payment in member.payments:
+                    if hasattr(payment.date, 'month'):
+                        # Check if payment falls in this bi-monthly period
+                        if i == 0 and payment.date.month in [start_date.month, start_date.month + 1]:
+                            period_paid += payment.amount
+                        elif i == 1 and payment.date.month in [start_date.month + 2, start_date.month + 3]:
+                            period_paid += payment.amount
+                
+                status = 'paid' if period_paid >= bimonthly_amount else 'pending'
+                payment_schedule.append({
+                    'due_date': due_date.isoformat(),
+                    'amount': bimonthly_amount,
+                    'description': f'Bi-monthly payment {i+1}/2',
+                    'status': status,
+                    'amount_due': max(0, bimonthly_amount - period_paid)
+                })
+        
+        return render_template('member_details.html',
+                             member=member,
+                             payment_schedule=payment_schedule,
+                             balance=balance)
+    except Exception as e:
+        print(f"❌ Error loading member details: {e}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        flash(f'Error loading member details: {e}', 'error')
+        return redirect(url_for('dashboard'))
 @app.route('/budget_management', methods=['GET', 'POST'])
 @require_auth
 @require_permission('manage_budgets')
