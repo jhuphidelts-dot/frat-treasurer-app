@@ -694,7 +694,7 @@ def landing_page():
 def dashboard():
     try:
         # Database mode - get data from SQLAlchemy models
-        from models import BudgetLimit, Transaction
+        from models import BudgetLimit, Transaction, Member as DBMember
         
         members = {}
         pending_brothers = {}  # No pending brothers in database mode for now
@@ -812,6 +812,8 @@ def add_member():
 @require_auth
 @require_permission('add_transactions')
 def add_transaction():
+    from models import Transaction as DBTransaction, Semester as DBSemester
+    
     category = request.form['category']
     description = request.form['description']
     amount = float(request.form['amount'])
@@ -822,12 +824,12 @@ def add_transaction():
         current_semester = DBSemester.query.filter_by(is_current=True).first()
         
         transaction = DBTransaction(
-        date=datetime.now().date(),
-        category=category,
-        description=description,
-        amount=amount,
-        type=transaction_type,
-        semester_id=current_semester.id if current_semester else None
+            date=datetime.now().date(),
+            category=category,
+            description=description,
+            amount=amount,
+            type=transaction_type,
+            semester_id=current_semester.id if current_semester else None
         )
         
         db.session.add(transaction)
