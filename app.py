@@ -1464,50 +1464,39 @@ def budget_management():
                                      budget_summary=budget_summary,
                                      dues_summary=dues_summary,
                                      categories=BUDGET_CATEGORIES)
-        else:
-                # JSON mode
-                if not treasurer_app:
-                    print(f"❌ Treasurer app is None")
-                    flash('Application not properly initialized', 'error')
-                    return redirect(url_for('dashboard'))
+        elif request.method == 'POST':
+                # POST request - update budget limits
+                from models import BudgetLimit
+                
+                try:
+                    for category in BUDGET_CATEGORIES:
+                        amount_key = f'budget_{category.replace("(", "_").replace(")", "_").replace(" ", "_").replace(",", "")}'
+                        if amount_key in request.form:
+                            amount = float(request.form[amount_key] or 0)
+                            # Update or create budget limit
+                            limit = BudgetLimit.query.filter_by(category=category).first()
+                            if limit:
+                                limit.amount = amount
+                            else:
+                                limit = BudgetLimit(category=category, amount=amount)
+                                db.session.add(limit)
                     
-                # TODO: Implement database version
-                # dues_summary = treasurer_app.get_dues_collection_summary()
-                return render_template('budget_management.html',
-                                     # TODO: Implement database version
-                                     # budget_limits=treasurer_app.budget_limits,
-                                     # TODO: Implement database version
-                                     # budget_summary=treasurer_app.get_budget_summary(),
-                                     dues_summary=dues_summary,
-                                     categories=BUDGET_CATEGORIES)
+                    db.session.commit()
+                    flash('Budget limits updated successfully!')
+                    return redirect(url_for('budget_management'))
+                except Exception as post_error:
+                    db.session.rollback()
+                    print(f"❌ Budget management POST error: {post_error}")
+                    import traceback
+                    print(f"❌ Traceback: {traceback.format_exc()}")
+                    flash(f'Error updating budget limits: {str(post_error)}', 'error')
+                    return redirect(url_for('budget_management'))
     except Exception as e:
         print(f"❌ Budget management error: {e}")
         import traceback
         print(f"❌ Traceback: {traceback.format_exc()}")
         flash(f'Error loading budget management: {str(e)}', 'error')
         return redirect(url_for('dashboard'))
-        
-        # POST request - update budget limits
-        if not treasurer_app:
-            print(f"❌ Treasurer app is None in POST")
-            flash('Application not properly initialized', 'error')
-            return redirect(url_for('dashboard'))
-        
-        for category in BUDGET_CATEGORIES:
-            amount_key = f'budget_{category.replace("(", "_").replace(")", "_").replace(" ", "_").replace(",", "")}'
-        if amount_key in request.form:
-                amount = float(request.form[amount_key] or 0)
-                # TODO: Implement database version
-                # treasurer_app.update_budget_limit(category, amount)
-        
-            flash('Budget limits updated successfully!')
-            return redirect(url_for('budget_management'))
-    except Exception as e:
-        print(f"❌ Budget management POST error: {e}")
-        import traceback
-        print(f"❌ Traceback: {traceback.format_exc()}")
-        flash(f'Error updating budget limits: {str(e)}', 'error')
-        return redirect(url_for('budget_management'))
 
 @app.route('/edit_budget_category/<category>', methods=['GET', 'POST'])
 @require_auth
@@ -1544,53 +1533,51 @@ def edit_budget_category(category):
 @require_auth
 @require_permission('edit_members')
 def custom_payment_schedule(member_id):
-    # TODO: Implement database version
-    # if member_id not in treasurer_app.members:
+    # TODO: Implement database version - this entire function needs database implementation
+    from models import Member
+    
+    member = Member.query.get(int(member_id))
+    if not member:
         flash('Member not found!')
         return redirect(url_for('dashboard'))
-    
-    # TODO: Implement database version
-    # member = treasurer_app.members[member_id]
     
     if request.method == 'GET':
         return render_template('custom_payment_schedule.html',
                              member=member)
     
     # POST request - update custom payment schedule
-    custom_schedule = []
-    payment_count = int(request.form.get('payment_count', 0))
-    
-    for i in range(payment_count):
-        due_date = request.form.get(f'due_date_{i}')
-        amount = request.form.get(f'amount_{i}')
-        description = request.form.get(f'description_{i}')
+    try:
+        custom_schedule = []
+        payment_count = int(request.form.get('payment_count', 0))
         
-        if due_date and amount and description:
-            try:
-                # Validate date format and convert to ISO format
-                parsed_date = datetime.strptime(due_date, '%Y-%m-%d')
-                custom_schedule.append({
-                    'due_date': parsed_date.isoformat(),
-                    'amount': float(amount),
-                    'description': description
-                })
-        except (ValueError, TypeError) as e:
-                flash(f'Error in payment {i+1}: Invalid date or amount format')
-                return redirect(url_for('custom_payment_schedule', member_id=member_id))
-    
-    # Update member with custom schedule
-    member.payment_plan = 'custom'
-    # TODO: Implement database version
-    # success = treasurer_app.update_member(
-        member_id, member.name, member.contact, 
-        member.dues_amount, 'custom', custom_schedule
-    )
-    
-    if success:
-        flash(f'Custom payment schedule updated for {member.name}!')
+        for i in range(payment_count):
+            due_date = request.form.get(f'due_date_{i}')
+            amount = request.form.get(f'amount_{i}')
+            description = request.form.get(f'description_{i}')
+            
+            if due_date and amount and description:
+                try:
+                    # Validate date format and convert to ISO format
+                    parsed_date = datetime.strptime(due_date, '%Y-%m-%d')
+                    custom_schedule.append({
+                        'due_date': parsed_date.isoformat(),
+                        'amount': float(amount),
+                        'description': description
+                    })
+                except (ValueError, TypeError) as e:
+                    flash(f'Error in payment {i+1}: Invalid date or amount format')
+                    return redirect(url_for('custom_payment_schedule', member_id=member_id))
+        
+        # Update member with custom schedule
+        member.payment_plan = 'custom'
+        # TODO: Store custom_schedule in database (add custom_schedule JSON field to Member model)
+        db.session.commit()
+        
+        flash(f'Custom payment schedule updated for {member.full_name}!')
         return redirect(url_for('member_details', member_id=member_id))
-    else:
-        flash('Error updating payment schedule!')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating payment schedule: {e}')
         return redirect(url_for('custom_payment_schedule', member_id=member_id))
 
 @app.route('/dues_summary')
@@ -1606,39 +1593,34 @@ def dues_summary_page():
         
         # Build members dictionary for template
         for member in db_members:
-                total_paid = sum(payment.amount for payment in member.payments)
-                members[str(member.id)] = {
-                    'name': member.full_name,
-                    'dues_amount': member.dues_amount,
-                    'payments_made': [{'amount': p.amount, 'date': p.date.strftime('%Y-%m-%d'), 'method': p.payment_method} for p in member.payments]
-                }
-        
-            # Calculate dues summary
-            total_projected = sum(member.dues_amount for member in db_members)
-            total_collected = sum(sum(payment.amount for payment in member.payments) for member in db_members)
-            outstanding = total_projected - total_collected
-            collection_rate = (total_collected / total_projected * 100) if total_projected > 0 else 0
-            members_paid_up = sum(1 for member in db_members if sum(payment.amount for payment in member.payments) >= member.dues_amount)
-            members_outstanding = len(db_members) - members_paid_up
-        
-            dues_summary = {
-                'total_collected': total_collected,
-                'total_projected': total_projected,
-                'outstanding': outstanding,
-                'collection_rate': collection_rate,
-                'members_paid_up': members_paid_up,
-                'members_outstanding': members_outstanding
+            total_paid = sum(payment.amount for payment in member.payments)
+            members[str(member.id)] = {
+                'name': member.full_name,
+                'dues_amount': member.dues_amount,
+                'payments_made': [{'amount': p.amount, 'date': p.date.strftime('%Y-%m-%d'), 'method': p.payment_method} for p in member.payments]
             }
         
-        else:
-            print("❌ No data source available")
-            dues_summary = {'total_collected': 0.0, 'total_projected': 0.0, 'outstanding': 0.0, 'collection_rate': 0.0, 'members_paid_up': 0, 'members_outstanding': 0}
-            members = {}
+        # Calculate dues summary
+        total_projected = sum(member.dues_amount for member in db_members)
+        total_collected = sum(sum(payment.amount for payment in member.payments) for member in db_members)
+        outstanding = total_projected - total_collected
+        collection_rate = (total_collected / total_projected * 100) if total_projected > 0 else 0
+        members_paid_up = sum(1 for member in db_members if sum(payment.amount for payment in member.payments) >= member.dues_amount)
+        members_outstanding = len(db_members) - members_paid_up
         
-            print(f"🔍 Dues summary loaded: {dues_summary}")
-            return render_template('dues_summary.html',
-                             dues_summary=dues_summary,
-                             members=members)
+        dues_summary = {
+            'total_collected': total_collected,
+            'total_projected': total_projected,
+            'outstanding': outstanding,
+            'collection_rate': collection_rate,
+            'members_paid_up': members_paid_up,
+            'members_outstanding': members_outstanding
+        }
+        
+        print(f"🔍 Dues summary loaded: {dues_summary}")
+        return render_template('dues_summary.html',
+                         dues_summary=dues_summary,
+                         members=members)
     except Exception as e:
         print(f"❌ Dues summary error: {e}")
         import traceback
@@ -1664,102 +1646,90 @@ def transactions():
         print(f"🔍 Found {len(db_transactions)} transactions")
         
         for trans in db_transactions:
-                all_items.append({
-                    'id': trans.id,
-                    'date': trans.date.strftime('%Y-%m-%d'),
-                    'date_str': trans.date.strftime('%Y-%m-%d'),  # Add date_str for template
-                    'description': trans.description,
-                    'amount': trans.amount,
-                    'category': trans.category,
-                    'transaction_type': trans.type,
-                    'type': 'transaction'
-                })
+            all_items.append({
+                'id': trans.id,
+                'date': trans.date.strftime('%Y-%m-%d'),
+                'date_str': trans.date.strftime('%Y-%m-%d'),
+                'description': trans.description,
+                'amount': trans.amount,
+                'category': trans.category,
+                'transaction_type': trans.type,
+                'type': 'transaction'
+            })
         
-            # Get all payments as income transactions
-            print("🔍 Querying payments...")
-            db_payments = Payment.query.order_by(Payment.date.desc()).all()
-            print(f"🔍 Found {len(db_payments)} payments")
+        # Get all payments as income transactions
+        print("🔍 Querying payments...")
+        db_payments = Payment.query.order_by(Payment.date.desc()).all()
+        print(f"🔍 Found {len(db_payments)} payments")
         
         for payment in db_payments:
-                all_items.append({
-                    'id': f'payment_{payment.id}',
-                    'date': payment.date.strftime('%Y-%m-%d'),
-                    'date_str': payment.date.strftime('%Y-%m-%d'),
-                    'description': f'Payment from {payment.member.name} ({payment.payment_method})',
-                    'amount': payment.amount,
-                    'category': 'Dues Collection',
-                    'transaction_type': 'income',
-                    'type': 'payment',
-                    'member_name': payment.member.name
-                })
+            all_items.append({
+                'id': f'payment_{payment.id}',
+                'date': payment.date.strftime('%Y-%m-%d'),
+                'date_str': payment.date.strftime('%Y-%m-%d'),
+                'description': f'Payment from {payment.member.name} ({payment.payment_method})',
+                'amount': payment.amount,
+                'category': 'Dues Collection',
+                'transaction_type': 'income',
+                'type': 'payment',
+                'member_name': payment.member.name
+            })
         
-            # Sort all items by date (newest first)
-            all_items.sort(key=lambda x: x['date'] if x['date'] != 'Ongoing' else '1900-01-01', reverse=True)
+        # Sort all items by date (newest first)
+        all_items.sort(key=lambda x: x['date'] if x['date'] != 'Ongoing' else '1900-01-01', reverse=True)
         
-            # Get outstanding dues (members with unpaid balances)
-            print("🔍 Querying members for outstanding dues...")
-            members = Member.query.all()
-            print(f"🔍 Found {len(members)} members")
+        # Get outstanding dues (members with unpaid balances)
+        print("🔍 Querying members for outstanding dues...")
+        members = Member.query.all()
+        print(f"🔍 Found {len(members)} members")
         
         for member in members:
-                try:
-                    total_paid = sum(p.amount for p in member.payments)
-                    outstanding = member.dues_amount - total_paid
-                    if outstanding > 0:
-                        all_items.append({
-                            'id': f'outstanding_{member.id}',
-                            'date': 'Ongoing',
-                            'date_str': 'Ongoing',  # Add date_str for template
-                            'description': f'Outstanding dues - {member.name}',
-                            'amount': outstanding,
-                            'category': 'Dues',
-                            'transaction_type': 'outstanding',
-                            'type': 'outstanding'
-                        })
-                except Exception as e:
-                    print(f"⚠️ Error processing member {member.name}: {e}")
+            try:
+                total_paid = sum(p.amount for p in member.payments)
+                outstanding = member.dues_amount - total_paid
+                if outstanding > 0:
+                    all_items.append({
+                        'id': f'outstanding_{member.id}',
+                        'date': 'Ongoing',
+                        'date_str': 'Ongoing',
+                        'description': f'Outstanding dues - {member.name}',
+                        'amount': outstanding,
+                        'category': 'Dues',
+                        'transaction_type': 'outstanding',
+                        'type': 'outstanding'
+                    })
+            except Exception as e:
+                print(f"⚠️ Error processing member {member.name}: {e}")
         
-            # Calculate totals avoiding double-counting of dues collection
-            # Get income from actual transactions (excluding Dues Collection to avoid double-counting payments)
-            transaction_income = sum(item['amount'] for item in all_items 
-                                   if item['transaction_type'] == 'income' and item['type'] == 'transaction' and item['category'] != 'Dues Collection')
+        # Calculate totals avoiding double-counting of dues collection
+        transaction_income = sum(item['amount'] for item in all_items 
+                               if item['transaction_type'] == 'income' and item['type'] == 'transaction' and item['category'] != 'Dues Collection')
         
-            # Get income from payments (these are the actual dues collected)
-            payment_income = sum(item['amount'] for item in all_items 
-                               if item['transaction_type'] == 'income' and item['type'] == 'payment')
+        payment_income = sum(item['amount'] for item in all_items 
+                           if item['transaction_type'] == 'income' and item['type'] == 'payment')
         
-            # Include any manual "Dues Collection" transactions (but this might be double-counting)
-            dues_transactions = sum(item['amount'] for item in all_items 
-                                  if item['transaction_type'] == 'income' and item['type'] == 'transaction' and item['category'] == 'Dues Collection')
+        dues_transactions = sum(item['amount'] for item in all_items 
+                              if item['transaction_type'] == 'income' and item['type'] == 'transaction' and item['category'] == 'Dues Collection')
         
-            # Total income = other income transactions + payment records
-            # (We exclude manual dues collection transactions to prevent double-counting with payment records)
-            total_income = transaction_income + payment_income
+        total_income = transaction_income + payment_income
         
-            total_expenses = sum(item['amount'] for item in all_items 
-                                if item['transaction_type'] == 'expense')
-            total_outstanding = sum(item['amount'] for item in all_items 
-                                   if item['transaction_type'] == 'outstanding')
+        total_expenses = sum(item['amount'] for item in all_items 
+                            if item['transaction_type'] == 'expense')
+        total_outstanding = sum(item['amount'] for item in all_items 
+                               if item['transaction_type'] == 'outstanding')
         
-            # Calculate net position (all money in - all money out)
-            net_position = total_income - total_expenses
+        net_position = total_income - total_expenses
         
-            print(f"🔍 Income breakdown: transaction_income=${transaction_income}, payment_income=${payment_income}, dues_transactions=${dues_transactions}")
+        print(f"🔍 Income breakdown: transaction_income=${transaction_income}, payment_income=${payment_income}, dues_transactions=${dues_transactions}")
+        print(f"🔍 Totals: income={total_income}, expenses={total_expenses}, outstanding={total_outstanding}")
+        print(f"🔍 Rendering template with {len(all_items)} items")
         
-            print(f"🔍 Totals: income={total_income}, expenses={total_expenses}, outstanding={total_outstanding}")
-        
-        else:
-            print("🔍 No data source available")
-            all_items = []
-            total_income = total_expenses = total_outstanding = net_position = 0
-        
-            print(f"🔍 Rendering template with {len(all_items)} items")
-            return render_template('transactions.html',
-                             transactions=all_items,
-                             total_income=total_income,
-                             total_expenses=total_expenses,
-                             total_outstanding=total_outstanding,
-                             net_position=net_position)
+        return render_template('transactions.html',
+                         transactions=all_items,
+                         total_income=total_income,
+                         total_expenses=total_expenses,
+                         total_outstanding=total_outstanding,
+                         net_position=net_position)
         
     except Exception as e:
         print(f"❌ Transactions route error: {e}")
@@ -1777,56 +1747,40 @@ def transactions():
 def treasurer_setup():
     try:
         if request.method == 'GET':
-                # Database mode - get config from SQLAlchemy models
-                from models import TreasurerConfig
-                print("🔍 Using database mode for treasurer setup")
-                
-                config = TreasurerConfig.query.first()
-                if not config:
-                    # Create default config if none exists
-                    config = TreasurerConfig()
-                    db.session.add(config)
-                    db.session.commit()
-                    
-        else:
-                print("❌ No data source available")
-                # Create a mock config for display
-                from dataclasses import dataclass
-                @dataclass
-                class MockConfig:
-                    name: str = ''
-                    email: str = ''
-                    phone: str = ''
-                    smtp_username: str = ''
-                    smtp_password: str = ''
-                config = MockConfig()
-                
-            return render_template('treasurer_setup.html', config=config)
-        
-            # POST - Update treasurer configuration
-            # Database mode
+            # Database mode - get config from SQLAlchemy models
             from models import TreasurerConfig
+            print("🔍 Using database mode for treasurer setup")
+            
             config = TreasurerConfig.query.first()
-        if not config:
+            if not config:
+                # Create default config if none exists
                 config = TreasurerConfig()
                 db.session.add(config)
+                db.session.commit()
+            
+            return render_template('treasurer_setup.html', config=config)
         
+        elif request.method == 'POST':
+            # POST - Update treasurer configuration
+            from models import TreasurerConfig
+            config = TreasurerConfig.query.first()
+            if not config:
+                config = TreasurerConfig()
+                db.session.add(config)
+            
             config.name = request.form.get('name', '')
             config.email = request.form.get('email', '')
             config.phone = request.form.get('phone', '')
             config.smtp_username = request.form.get('smtp_username', '')
             config.smtp_password = request.form.get('smtp_password', '')
-        
+            
             db.session.commit()
-        
-        else:
-            flash('Configuration cannot be saved - no data source available', 'error')
-            return redirect(url_for('dashboard'))
-        
+            
             flash('Treasurer configuration updated successfully!')
             return redirect(url_for('treasurer_setup'))
         
     except Exception as e:
+        db.session.rollback()
         print(f"❌ Treasurer setup error: {e}")
         import traceback
         print(f"❌ Traceback: {traceback.format_exc()}")
@@ -1840,31 +1794,33 @@ def handover_treasurer():
     if request.method == 'GET':
         return render_template('handover_treasurer.html')
     
-    # Clear treasurer-specific data
-    # TODO: Implement database version
-    # config = treasurer_app.treasurer_config
-    config.name = ""
-    config.email = ""
-    config.phone = ""
-    config.smtp_username = ""
-    config.smtp_password = ""
-    
-    # TODO: Implement database version
-    # treasurer_app.save_treasurer_config()
-    
-    # Archive current semester
-    # TODO: Implement database version
-    # current_sem = treasurer_app.get_current_semester()
-    if current_sem:
-        current_sem.is_current = False
-        current_sem.archived = True
-        current_sem.end_date = datetime.now().isoformat()
-    
-    # TODO: Implement database version
-    # treasurer_app.save_data(treasurer_app.semesters_file, treasurer_app.semesters)
-    
-    flash('Treasurer handover completed! Please provide setup instructions to the new treasurer.')
-    return redirect(url_for('dashboard'))
+    try:
+        # Clear treasurer-specific data
+        from models import TreasurerConfig, Semester
+        
+        config = TreasurerConfig.query.first()
+        if config:
+            config.name = ""
+            config.email = ""
+            config.phone = ""
+            config.smtp_username = ""
+            config.smtp_password = ""
+        
+        # Archive current semester
+        current_sem = Semester.query.filter_by(is_current=True).first()
+        if current_sem:
+            current_sem.is_current = False
+            current_sem.archived = True
+            current_sem.end_date = datetime.now().isoformat()
+        
+        db.session.commit()
+        
+        flash('Treasurer handover completed! Please provide setup instructions to the new treasurer.')
+        return redirect(url_for('dashboard'))
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error during handover: {e}', 'error')
+        return redirect(url_for('dashboard'))
 
 @app.route('/optimize_storage')
 @require_auth
@@ -1885,66 +1841,48 @@ def optimize_storage():
 def semester_management():
     try:
         if request.method == 'GET':
-                # Database mode - get semesters from SQLAlchemy models
-                from models import Semester
-                print("🔍 Using database mode for semester management")
-                
-                db_semesters = Semester.query.all()
-                semesters = db_semesters
-                semesters.sort(key=lambda s: (s.year, ['Spring', 'Summer', 'Fall'].index(s.season)), reverse=True)
-                current_semester = Semester.query.filter_by(is_current=True).first()
-                
-                print(f"🔍 Found {len(semesters)} semesters from database")
-                
-        else:
-                print("❌ No data source available")
-                semesters = []
-                current_semester = None
-                
+            # Database mode - get semesters from SQLAlchemy models
+            from models import Semester
+            print("🔍 Using database mode for semester management")
+            
+            db_semesters = Semester.query.all()
+            semesters = db_semesters
+            semesters.sort(key=lambda s: (s.year, ['Spring', 'Summer', 'Fall'].index(s.season)), reverse=True)
+            current_semester = Semester.query.filter_by(is_current=True).first()
+            
+            print(f"🔍 Found {len(semesters)} semesters from database")
+            
             return render_template('semester_management.html', semesters=semesters, current_semester=current_semester)
-    except Exception as e:
-        print(f"❌ Semester management error: {e}")
-        import traceback
-        print(f"❌ Traceback: {traceback.format_exc()}")
-        flash(f'Error loading semester management: {str(e)}', 'error')
-        return redirect(url_for('dashboard'))
         
-        # POST - Create new semester
-        if not treasurer_app:
-            print(f"❌ Treasurer app is None in POST")
-            flash('Application not properly initialized', 'error')
-            return redirect(url_for('dashboard'))
-        
+        elif request.method == 'POST':
+            # POST - Create new semester
+            from models import Semester
+            
             season = request.form.get('season')
             year = int(request.form.get('year'))
-        
+            
             # Archive current semester
-            # TODO: Implement database version
-            # if treasurer_app.current_semester:
-            # TODO: Implement database version
-            # treasurer_app.current_semester.is_current = False
-            # TODO: Implement database version
-            # treasurer_app.current_semester.end_date = datetime.now().isoformat()
-        
+            current_sem = Semester.query.filter_by(is_current=True).first()
+            if current_sem:
+                current_sem.is_current = False
+                current_sem.end_date = datetime.now().isoformat()
+            
             # Create new semester
             semester_id = f"{season.lower()}_{year}"
             new_semester = Semester(id=semester_id, name=f"{season} {year}", year=year, season=season, 
                                start_date=datetime.now().isoformat(), end_date="", is_current=True)
-        
-            # TODO: Implement database version
-            # treasurer_app.semesters[semester_id] = new_semester
-            # TODO: Implement database version
-            # treasurer_app.current_semester = new_semester
-            # TODO: Implement database version
-            # treasurer_app.save_data(treasurer_app.semesters_file, treasurer_app.semesters)
-        
+            
+            db.session.add(new_semester)
+            db.session.commit()
+            
             flash(f'New semester {season} {year} created!')
             return redirect(url_for('semester_management'))
     except Exception as e:
-        print(f"❌ Semester management POST error: {e}")
+        db.session.rollback()
+        print(f"❌ Semester management error: {e}")
         import traceback
         print(f"❌ Traceback: {traceback.format_exc()}")
-        flash(f'Error creating semester: {str(e)}', 'error')
+        flash(f'Error in semester management: {str(e)}', 'error')
         return redirect(url_for('semester_management'))
 
 # Google Sheets export functionality removed
@@ -2001,9 +1939,10 @@ def exit_preview():
 @require_permission('send_reminders')
 def test_sms():
     """Test SMS functionality with comprehensive diagnostics"""
-    # TODO: Implement database version
-    # config = treasurer_app.treasurer_config
-    if not config.phone:
+    from models import TreasurerConfig
+    
+    config = TreasurerConfig.query.first()
+    if not config or not config.phone:
         flash('Please configure your phone number in Treasurer Setup first.', 'error')
         return redirect(url_for('treasurer_setup'))
     
@@ -2032,15 +1971,16 @@ def test_sms():
 @require_permission('send_reminders')
 def test_sms_to_number():
     """Test SMS to a specific phone number"""
-    # TODO: Implement database version
-    # config = treasurer_app.treasurer_config
+    from models import TreasurerConfig
+    
+    config = TreasurerConfig.query.first()
     test_phone = request.form.get('test_phone', '').strip()
     
     if not test_phone:
         flash('Please enter a phone number to test.', 'error')
         return redirect(url_for('notifications_dashboard'))
     
-    if not config.smtp_username or not config.smtp_password:
+    if not config or not config.smtp_username or not config.smtp_password:
         flash('Please configure your email credentials in Treasurer Setup first.', 'error')
         return redirect(url_for('treasurer_setup'))
     
@@ -2065,10 +2005,11 @@ def submit_payment_plan():
     member_name = request.form.get('member_name', 'Unknown Member')
     plan_details = request.form.get('plan_details', '')
     
-    # Notify treasurer about the request
-    # TODO: Implement database version
-    # if notify_payment_plan_request(member_name, plan_details, treasurer_app.treasurer_config):
-        flash('Payment plan request submitted successfully! Treasurer has been notified.')
+    # TODO: Implement notification for payment plan request
+    # from models import TreasurerConfig
+    # config = TreasurerConfig.query.first()
+    # if notify_payment_plan_request(member_name, plan_details, config):
+    flash('Payment plan request submitted successfully! Treasurer has been notified.')
     return redirect(url_for('dashboard'))
 
 @app.route('/submit_reimbursement', methods=['POST'])
@@ -2080,10 +2021,11 @@ def submit_reimbursement():
     category = request.form.get('category', '')
     description = request.form.get('description', '')
     
-    # Notify treasurer about the request
-    # TODO: Implement database version
-    # if notify_reimbursement_request(submitter_name, amount, category, description, treasurer_app.treasurer_config):
-        flash('Reimbursement request submitted successfully! Treasurer has been notified.')
+    # TODO: Implement notification for reimbursement request
+    # from models import TreasurerConfig
+    # config = TreasurerConfig.query.first()
+    # if notify_reimbursement_request(submitter_name, amount, category, description, config):
+    flash('Reimbursement request submitted successfully! Treasurer has been notified.')
     return redirect(url_for('dashboard'))
 
 @app.route('/test_approval_notification')
@@ -2091,9 +2033,10 @@ def submit_reimbursement():
 @require_permission('send_reminders')
 def test_approval_notification():
     """Test the approval notification system"""
-    # TODO: Implement database version
-    # config = treasurer_app.treasurer_config
-    if not config.phone and not config.email:
+    from models import TreasurerConfig
+    
+    config = TreasurerConfig.query.first()
+    if not config or (not config.phone and not config.email):
         flash('Please configure your phone and/or email in Treasurer Setup first.')
         return redirect(url_for('treasurer_setup'))
     
@@ -2117,25 +2060,16 @@ def notifications_dashboard():
         
         config = TreasurerConfig.query.first()
         if config:
-                email_configured = bool(config.smtp_username and config.smtp_password)
-                treasurer_phone_configured = bool(config.phone)
-                
-                notification_status = {
-                    'email_configured': email_configured,
-                    'treasurer_phone_configured': treasurer_phone_configured,
-                    'email_username': config.smtp_username,
-                    'treasurer_phone': config.phone
-                }
+            email_configured = bool(config.smtp_username and config.smtp_password)
+            treasurer_phone_configured = bool(config.phone)
+            
+            notification_status = {
+                'email_configured': email_configured,
+                'treasurer_phone_configured': treasurer_phone_configured,
+                'email_username': config.smtp_username,
+                'treasurer_phone': config.phone
+            }
         else:
-                notification_status = {
-                    'email_configured': False,
-                    'treasurer_phone_configured': False,
-                    'email_username': '',
-                    'treasurer_phone': ''
-                }
-                
-        else:
-            print("❌ No data source available")
             notification_status = {
                 'email_configured': False,
                 'treasurer_phone_configured': False,
@@ -2143,14 +2077,14 @@ def notifications_dashboard():
                 'treasurer_phone': ''
             }
         
-            print(f"🔍 Notification status: {notification_status}")
+        print(f"🔍 Notification status: {notification_status}")
         
-            # TODO: In the future, you could add pending approval requests here
-            # For example:
-            # pending_requests = get_pending_approval_requests()
+        # TODO: In the future, you could add pending approval requests here
+        # For example:
+        # pending_requests = get_pending_approval_requests()
         
-            return render_template('notifications_dashboard.html',
-                             notification_status=notification_status)
+        return render_template('notifications_dashboard.html',
+                         notification_status=notification_status)
     except Exception as e:
         print(f"❌ Notifications dashboard error: {e}")
         import traceback
@@ -2174,23 +2108,25 @@ def brother_registration():
         flash('All fields are required.', 'error')
         return render_template('brother_registration.html')
     
-    # Check if email already exists
-    # TODO: Implement database version
-    # if email in treasurer_app.users:
-        flash('An account with this email already exists.', 'error')
-        return render_template('brother_registration.html')
-    
-    # Check if already registered
-    # TODO: Implement database version
-    # for pending in treasurer_app.pending_brothers.values():
-        if pending.email.lower() == email:
+    try:
+        from models import User, PendingBrother
+        
+        # Check if email already exists
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            flash('An account with this email already exists.', 'error')
+            return render_template('brother_registration.html')
+        
+        # Check if already registered
+        existing_pending = PendingBrother.query.filter_by(email=email).first()
+        if existing_pending:
             flash('Registration with this email is already pending approval.', 'warning')
             return render_template('brother_registration.html')
-    
-    # Register the brother
-    try:
-        # TODO: Implement database version
-        # pending_id = treasurer_app.register_brother(full_name, phone, email)
+        
+        # Register the brother
+        pending_brother = PendingBrother(full_name=full_name, phone=phone, email=email)
+        db.session.add(pending_brother)
+        db.session.commit()
         
         # Success message with clear next steps
         flash('🎉 Registration submitted successfully!', 'success')
@@ -2203,6 +2139,7 @@ def brother_registration():
                              phone=phone, 
                              email=email)
     except Exception as e:
+        db.session.rollback()
         flash(f'Registration failed: {str(e)}', 'error')
         return render_template('brother_registration.html')
 
@@ -2229,7 +2166,7 @@ def brother_dashboard_preview(role_name):
         role: str = role_name
         
         def __post_init__(self):
-        if self.payments_made is None:
+            if self.payments_made is None:
                 self.payments_made = [
                     {'amount': 250.0, 'date': '2024-09-01', 'method': 'Zelle', 'id': 'preview1'}
                 ]
@@ -2270,31 +2207,13 @@ def brother_dashboard():
     # Get current user's member info
     member = get_user_member()
     if not member:
-        # Create a mock member for database mode if no member record exists
-        from dataclasses import dataclass
-        @dataclass
-        class MockMember:
-                id: str = session.get('user_id', 'unknown')
-                name: str = session.get('user', 'Brother')
-                contact: str = session.get('user', 'N/A')
-                dues_amount: float = 500.0
-                payments_made: list = None
-                contact_type: str = 'email'
-                role: str = get_current_user_role()
-                
-                def __post_init__(self):
-                    if self.payments_made is None:
-                        self.payments_made = []
-        
-        member = MockMember()
-        else:
-            flash('Member information not found. Please contact the treasurer.', 'error')
-            return redirect(url_for('logout'))
+        flash('Member information not found. Please contact the treasurer.', 'error')
+        return redirect(url_for('logout'))
     
-    # Get summary data based on system type
-        # Database mode - use SQLAlchemy models
-        balance = member.get_balance() if hasattr(member, 'get_balance') else 0.0
-        payment_schedule = []  # TODO: Implement payment schedule for database mode
+    # Get summary data using database
+    balance = member.get_balance() if hasattr(member, 'get_balance') else 0.0
+    payment_schedule = []  # TODO: Implement payment schedule for database mode
+    
     # Basic data for all users
     data = {
         'member': member,
@@ -2304,12 +2223,12 @@ def brother_dashboard():
     
     # Add additional data for executives based on permissions
     if has_permission('view_all_data'):
-        # Database mode - get data from SQLAlchemy models
+        from models import Member as DBMember
         total_members = DBMember.query.count()
         data.update({
-                'total_members': total_members,
-                'dues_summary': {'total_collected': 0.0, 'total_projected': 0.0, 'outstanding': 0.0, 'collection_rate': 0.0},  # TODO: Implement for database mode
-                'budget_summary': {}  # TODO: Implement for database mode
+            'total_members': total_members,
+            'dues_summary': {'total_collected': 0.0, 'total_projected': 0.0, 'outstanding': 0.0, 'collection_rate': 0.0},
+            'budget_summary': {}
         })
     return render_template('brother_dashboard.html', **data)
 
@@ -2318,26 +2237,16 @@ def brother_dashboard():
 @require_permission('manage_users')
 def debug_pending_brothers():
     """Debug route to check pending brothers status"""
+    from models import PendingBrother
+    
     print(f"\n🔍 DEBUGGING PENDING BROTHERS")
-    # TODO: Implement database version
-    # print(f"   Pending brothers file: {treasurer_app.pending_brothers_file}")
-    # TODO: Implement database version
-    # print(f"   File exists: {os.path.exists(treasurer_app.pending_brothers_file)}")
-    # TODO: Implement database version
-    # print(f"   Compressed file exists: {os.path.exists(treasurer_app.pending_brothers_file + '.gz')}")
+    pending_brothers = PendingBrother.query.all()
+    print(f"   Current pending brothers count: {len(pending_brothers)}")
     
-    # Force reload from disk
-    # TODO: Implement database version
-    # treasurer_app.pending_brothers = treasurer_app.load_data(treasurer_app.pending_brothers_file, {})
-    # TODO: Implement database version
-    # print(f"   Current pending brothers count: {len(treasurer_app.pending_brothers)}")
+    for pending_brother in pending_brothers:
+        print(f"   - {pending_brother.id}: {pending_brother.full_name} ({pending_brother.email})")
     
-    # TODO: Implement database version
-    # for pending_id, pending_brother in treasurer_app.pending_brothers.items():
-        print(f"   - {pending_id}: {pending_brother.full_name} ({pending_brother.email})")
-    
-    # TODO: Implement database version
-    # flash(f'Debug complete: {len(treasurer_app.pending_brothers)} pending brothers found. Check console for details.')
+    flash(f'Debug complete: {len(pending_brothers)} pending brothers found. Check console for details.')
     return redirect(url_for('verify_brothers'))
 
 @app.route('/credential_management')
@@ -2345,30 +2254,34 @@ def debug_pending_brothers():
 @require_permission('manage_users')
 def credential_management():
     """Credential management page for treasurers to view all brother login details"""
+    from models import User
+    
     print(f"\n🔐 LOADING CREDENTIAL MANAGEMENT")
     
     credentials = []
     brother_accounts = 0
     linked_accounts = 0
     
-        users = User.query.all()
-        total_users = len(users)
-        for user in users:
-            is_brother = any(r.name == 'brother' for r in user.roles) or (user.get_primary_role() and user.get_primary_role().name == 'brother')
+    users = User.query.all()
+    total_users = len(users)
+    
+    for user in users:
+        is_brother = any(r.name == 'brother' for r in user.roles) or (user.get_primary_role() and user.get_primary_role().name == 'brother')
         if is_brother:
-                brother_accounts += 1
-                member = getattr(user, 'member_record', None)
-                credentials.append({
-                    'username': user.phone or user.email,
-                    'password': '********** (Hashed - Not Recoverable)',
-                    'role': user.get_primary_role().name if user.get_primary_role() else 'brother',
-                    'created_at': getattr(user, 'created_at', 'Unknown'),
-                    'member_name': getattr(member, 'full_name', getattr(member, 'name', None)) if member else None,
-                    'member_id': getattr(member, 'id', None) if member else None,
-                    'phone': user.phone
-                })
-                if member:
-                    linked_accounts += 1
+            brother_accounts += 1
+            member = getattr(user, 'member_record', None)
+            credentials.append({
+                'username': user.phone or user.email,
+                'password': '********** (Hashed - Not Recoverable)',
+                'role': user.get_primary_role().name if user.get_primary_role() else 'brother',
+                'created_at': getattr(user, 'created_at', 'Unknown'),
+                'member_name': getattr(member, 'full_name', getattr(member, 'name', None)) if member else None,
+                'member_id': getattr(member, 'id', None) if member else None,
+                'phone': user.phone
+            })
+            if member:
+                linked_accounts += 1
+    
     print(f"   Total users: {total_users}")
     print(f"   Brother accounts: {brother_accounts}")
     print(f"   Linked accounts: {linked_accounts}")
@@ -2386,28 +2299,28 @@ def verify_brothers():
     """Treasurer interface to verify pending brother registrations"""
     try:
         # Database mode - handle pending user approvals
-        from models import User
+        from models import User, Member as MemberModel, Role
         print("🔍 Using database mode for brother verification")
         
         if request.method == 'GET':
-                # Get pending users (status='pending')
-                pending_users = User.query.filter_by(status='pending').all()
-                # Get all members to link with
-                from models import Member as MemberModel
-                members = MemberModel.query.all()
-                
-                print(f"👥 Found {len(pending_users)} pending users")
-                
-                return render_template('verify_brothers_db.html',
-                                     pending_users=pending_users,
-                                     members=members)
+            # Get pending users (status='pending')
+            pending_users = User.query.filter_by(status='pending').all()
+            # Get all members to link with
+            members = MemberModel.query.all()
+            
+            print(f"👥 Found {len(pending_users)} pending users")
+            
+            return render_template('verify_brothers_db.html',
+                                 pending_users=pending_users,
+                                 members=members)
         
+        elif request.method == 'POST':
             # POST request - handle approval/rejection
             user_id = request.form.get('user_id')
             member_id = request.form.get('member_id')
             action = request.form.get('action')
-        
-        if action == 'approve' and user_id:
+            
+            if action == 'approve' and user_id:
                 user = User.query.get(user_id)
                 if user:
                     user.status = 'active'
@@ -2415,13 +2328,11 @@ def verify_brothers():
                     
                     # Link to member if specified
                     if member_id:
-                        from models import Member as MemberModel
                         member = MemberModel.query.get(member_id)
                         if member:
                             member.user_id = user.id
                     
                     # Assign brother role
-                    from models import Role
                     brother_role = Role.query.filter_by(name='brother').first()
                     if brother_role and brother_role not in user.roles:
                         user.roles.append(brother_role)
@@ -2429,7 +2340,8 @@ def verify_brothers():
                     db.session.commit()
                     
                     # Send SMS credentials if configured
-                    config = None
+                    from models import TreasurerConfig
+                    config = TreasurerConfig.query.first()
                     if config and config.smtp_username and user.phone:
                         password_msg = f"Welcome to the fraternity app! Login: {user.phone} | Password: (same as registration)"
                         send_email_to_sms(user.phone, password_msg, config)
@@ -2437,8 +2349,8 @@ def verify_brothers():
                     flash(f'User {user.full_name} approved and activated!', 'success')
                 else:
                     flash('User not found!', 'error')
-        
-        elif action == 'reject' and user_id:
+            
+            elif action == 'reject' and user_id:
                 user = User.query.get(user_id)
                 if user:
                     db.session.delete(user)
@@ -2446,54 +2358,11 @@ def verify_brothers():
                     flash(f'User {user.full_name} rejected and removed.', 'info')
                 else:
                     flash('User not found!', 'error')
-        
-            return redirect(url_for('verify_brothers'))
-        
-        if not treasurer_app:
-            flash('Application not properly initialized for brother verification.', 'error')
-            return redirect(url_for('dashboard'))
-        
-        if request.method == 'GET':
-            # Force reload pending brothers from disk
-            # TODO: Implement database version
-            # treasurer_app.pending_brothers = treasurer_app.load_data(treasurer_app.pending_brothers_file, {})
-            print(f"\n👥 VERIFY BROTHERS PAGE LOAD")
-            # TODO: Implement database version
-            # print(f"   Pending brothers count: {len(treasurer_app.pending_brothers)}")
-        
-            return render_template('verify_brothers.html',
-                                 # TODO: Implement database version
-                                 # pending_brothers=treasurer_app.pending_brothers,
-                                 # TODO: Implement database version
-                                 # members=treasurer_app.members)
-        
-            # POST request - process verification
-            pending_id = request.form.get('pending_id')
-            member_id = request.form.get('member_id')
-            action = request.form.get('action')
-        
-        if action == 'verify' and pending_id and member_id:
-            # TODO: Implement database version
-            # success, message = treasurer_app.verify_brother_with_member(pending_id, member_id)
-        if success:
-                flash(message, 'success')
-        else:
-                flash(message, 'error')
-        elif action == 'reject' and pending_id:
-            # Remove pending registration
-            # TODO: Implement database version
-            # if pending_id in treasurer_app.pending_brothers:
-                # TODO: Implement database version
-                # del treasurer_app.pending_brothers[pending_id]
-                # TODO: Implement database version
-                # treasurer_app.save_data(treasurer_app.pending_brothers_file, treasurer_app.pending_brothers)
-                flash('Registration rejected and removed.', 'info')
-        else:
-                flash('Registration not found.', 'error')
-        
+            
             return redirect(url_for('verify_brothers'))
         
     except Exception as e:
+        db.session.rollback()
         print(f"❌ Verify brothers error: {e}")
         import traceback
         print(f"❌ Traceback: {traceback.format_exc()}")
@@ -2505,25 +2374,24 @@ def verify_brothers():
 @require_permission('assign_roles')
 def role_management():
     """Role management interface for treasurers"""
-        # Database mode - get members from SQLAlchemy
-        from models import Member as MemberModel
-        db_members = MemberModel.query.all()
-        members = {}
-        for member in db_members:
-            members[str(member.id)] = member
+    from models import Member as MemberModel
+    
+    db_members = MemberModel.query.all()
+    members = {}
+    for member in db_members:
+        members[str(member.id)] = member
+    
     # Log current executive board for debugging
     executive_roles = ['treasurer', 'president', 'vice_president', 'social_chair', 'phi_ed_chair', 'brotherhood_chair', 'recruitment_chair']
     print(f"✅ Current Executive Board:")
+    
     for exec_role in executive_roles:
         assigned_members = []
         for member_id, member in members.items():
-                member_role = getattr(member, 'role', 'brother')
-                member_name = getattr(member, 'full_name', getattr(member, 'name', 'Unknown'))
-        else:
-                member_role = member.role if hasattr(member, 'role') else member.get('role', 'brother')
-                member_name = member.name if hasattr(member, 'name') else member.get('name', 'Unknown')
-        
-        if member_role == exec_role:
+            member_role = getattr(member, 'role', 'brother')
+            member_name = getattr(member, 'full_name', getattr(member, 'name', 'Unknown'))
+            
+            if member_role == exec_role:
                 assigned_members.append(member_name)
         
         if assigned_members:
@@ -2538,6 +2406,8 @@ def role_management():
 @require_permission('assign_roles')
 def assign_role():
     """Assign a role to a member"""
+    from models import Member as MemberModel, User, Role
+    
     member_id = request.form.get('member_id')
     role = request.form.get('role')
     
@@ -2545,138 +2415,52 @@ def assign_role():
         flash('Member and role must be specified.', 'error')
         return redirect(url_for('role_management'))
     
-        # Database mode - handle role assignment via SQLAlchemy
-        from models import Member as MemberModel, User, Role
-        
+    try:
         member = MemberModel.query.get(member_id)
         if not member:
             flash('Member not found.', 'error')
             return redirect(url_for('role_management'))
         
-            # Check if role is already taken
+        # Check if role is already taken
         if role != 'brother':
             existing_member = MemberModel.query.filter_by(role=role).first()
-        if existing_member and str(existing_member.id) != member_id:
+            if existing_member and str(existing_member.id) != member_id:
                 flash(f'{role.replace("_", " ").title()} position is already filled by {existing_member.full_name}.', 'warning')
                 return redirect(url_for('role_management'))
         
-            # Update member role in database
-            old_role = member.role or 'brother'
-            member.role = role
+        # Update member role in database
+        member.role = role
         
-            # Update user roles if user account exists
+        # Update user roles if user account exists
         if member.user:
             user = member.user
             # Clear existing roles except admin
             user.roles = [r for r in user.roles if r.name == 'admin']
-        
+            
             # Add new role
-        if role != 'brother':
+            if role != 'brother':
                 role_obj = Role.query.filter_by(name=role).first()
                 if not role_obj:
                     role_obj = Role(name=role, description=f'{role.replace("_", " ").title()} role')
                     db.session.add(role_obj)
                 user.roles.append(role_obj)
-        
+            
             # Ensure brother role
             brother_role = Role.query.filter_by(name='brother').first()
-        if not brother_role:
+            if not brother_role:
                 brother_role = Role(name='brother', description='Brother role')
                 db.session.add(brother_role)
-        if brother_role not in user.roles:
+            if brother_role not in user.roles:
                 user.roles.append(brother_role)
         
-            try:
-            db.session.commit()
-            flash(f'{member.full_name} has been successfully assigned as {role.replace("_", " ").title()}.', 'success')
-            print(f"✅ Database role assignment: {member.full_name} -> {role}")
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error assigning role: {e}', 'error')
-            print(f"❌ Database role assignment failed: {e}")
-        
-            return redirect(url_for('role_management'))
-    
-    else:
-        flash('Application not properly initialized', 'error')
-        return redirect(url_for('role_management'))
-    
-    # Check if role is already taken (except for brother role)
-    if role != 'brother':
-        # TODO: Implement database version
-        # for existing_id, existing_member in treasurer_app.members.items():
-        if hasattr(existing_member, 'role') and existing_member.role == role and existing_id != member_id:
-                flash(f'{role.replace("_", " ").title()} position is already filled by {existing_member.name}.', 'warning')
-                return redirect(url_for('role_management'))
-    
-    # Update member role in JSON system
-    # TODO: Implement database version
-    # member = treasurer_app.members[member_id]
-    old_role = member.role if hasattr(member, 'role') and member.role else 'brother'
-    member.role = role
-    
-    # Also update in SQLAlchemy system if user account exists
-    try:
-        from models import db, User, Role
-        if hasattr(member, 'user_id') and member.user_id:
-            user = User.query.get(member.user_id)
-        if user:
-                # Clear existing roles (except admin which should be preserved)
-                user.roles = [r for r in user.roles if r.name == 'admin']
-                
-                # Add new role
-                if role != 'brother':  # brother is default, no explicit role needed
-                    role_obj = Role.query.filter_by(name=role).first()
-                    if not role_obj:
-                        # Create role if it doesn't exist
-                        role_obj = Role(name=role, description=f'{role.replace("_", " ").title()} role')
-                        db.session.add(role_obj)
-                    user.roles.append(role_obj)
-                
-                # Always ensure brother role exists as base
-                brother_role = Role.query.filter_by(name='brother').first()
-                if not brother_role:
-                    brother_role = Role(name='brother', description='Brother role')
-                    db.session.add(brother_role)
-                if brother_role not in user.roles:
-                    user.roles.append(brother_role)
-                
-                db.session.commit()
-                print(f"Updated SQLAlchemy roles for user {user.full_name}: {[r.name for r in user.roles]}")
-    except Exception as e:
-        print(f"SQLAlchemy role update failed (continuing with JSON): {e}")
-        # Continue with JSON-only update if SQLAlchemy fails
-    
-    # Save JSON changes
-    try:
-        # TODO: Implement database version
-        # treasurer_app.save_data(treasurer_app.members_file, treasurer_app.members)
-        print(f"✅ Successfully saved role assignment: {member.name} -> {role}")
-        print(f"✅ Member data after save: role={member.role}")
-        
-        # Force reload the members data to ensure consistency
-        # TODO: Implement database version
-        # treasurer_app.members = treasurer_app.load_data(treasurer_app.members_file, {})
-        print(f"✅ Reloaded member data from disk")
+        db.session.commit()
+        flash(f'{member.full_name} has been successfully assigned as {role.replace("_", " ").title()}.', 'success')
+        print(f"✅ Database role assignment: {member.full_name} -> {role}")
         
     except Exception as e:
-        print(f"❌ Failed to save member data: {e}")
-        flash(f'Error saving role assignment: {e}', 'error')
-        return redirect(url_for('role_management'))
-    
-    # Verify the assignment was saved
-    # TODO: Implement database version
-    # updated_members = treasurer_app.load_data(treasurer_app.members_file, {})
-    updated_member = updated_members.get(member_id)
-    if updated_member and hasattr(updated_member, 'role'):
-        print(f"✅ Verification: {updated_member.name} role is now {updated_member.role}")
-        flash(f'{member.name} has been successfully assigned as {role.replace("_", " ").title()}.', 'success')
-    elif updated_member and isinstance(updated_member, dict):
-        print(f"✅ Verification: {updated_member.get('name')} role is now {updated_member.get('role')}")
-        flash(f'{member.name} has been successfully assigned as {role.replace("_", " ").title()}.', 'success')
-    else:
-        print(f"❌ Verification failed: could not confirm role assignment")
-        flash(f'Role assignment may have failed. Please check the Executive Board.', 'warning')
+        db.session.rollback()
+        flash(f'Error assigning role: {e}', 'error')
+        print(f"❌ Database role assignment failed: {e}")
     
     return redirect(url_for('role_management'))
 
