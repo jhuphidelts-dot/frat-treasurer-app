@@ -655,14 +655,14 @@ def monthly_income():
         for payment in payments:
             month_key = payment.date.strftime('%Y-%m')
             month_name = payment.date.strftime('%B %Y')
-        
-        if month_key not in monthly_data:
+            
+            if month_key not in monthly_data:
                 monthly_data[month_key] = {
                     'month_name': month_name,
                     'total_amount': 0.0,
                     'transaction_count': 0
                 }
-        
+            
             monthly_data[month_key]['total_amount'] += payment.amount
             monthly_data[month_key]['transaction_count'] += 1
         
@@ -707,15 +707,15 @@ def dashboard():
         for member in db_members:
             # Calculate total paid for this member
             total_paid = sum(payment.amount for payment in member.payments)
-        
+            
             print(f"🔍 {member.name}: ${member.dues_amount} dues, ${total_paid} paid, ${member.dues_amount - total_paid} balance")
-        
+            
             # Add payment info to member object for template display with multiple attribute names
             member.total_paid = total_paid
             member.balance = member.dues_amount - total_paid
             member.paid = total_paid  # Template might expect 'paid' attribute
             member.amount_paid = total_paid  # Another possible attribute name
-        
+            
             members[str(member.id)] = member
         
             # Calculate dues summary from database
@@ -729,7 +729,7 @@ def dashboard():
                 member_payments = sum(payment.amount for payment in member.payments)
                 total_collected += member_payments
                 print(f"🔍 {member.name}: ${member_payments} paid of ${member.dues_amount} due")
-        except Exception as e:
+            except Exception as e:
                 print(f"⚠️ Error calculating payments for {member.name}: {e}")
         
             outstanding = total_projected - total_collected
@@ -754,9 +754,9 @@ def dashboard():
             spent = sum(t.amount for t in expense_transactions)
             remaining = limit.amount - spent
             percent_used = (spent / limit.amount * 100) if limit.amount > 0 else 0
-        
+            
             print(f"🔍 Budget {limit.category}: ${limit.amount} limit, ${spent} spent ({len(expense_transactions)} transactions), ${remaining} remaining")
-        
+            
             # Create object-like dict that matches template expectations
             budget_summary[limit.category] = {
                 'budget_limit': limit.amount,  # Template expects 'budget_limit' attribute
@@ -1103,9 +1103,9 @@ def bulk_import():
         line = line.strip()
         if not line:
             continue
-        
+            
             # Try to parse different formats
-            parts = [part.strip() for part in line.split('\t') if part.strip()]  # Tab-separated
+            parts = [part.strip() for part in line.split('\\t') if part.strip()]  # Tab-separated
         if len(parts) < 2:
             parts = [part.strip() for part in line.split(',') if part.strip()]  # Comma-separated
         if len(parts) < 2:
@@ -1114,9 +1114,9 @@ def bulk_import():
         if len(parts) >= 2:
             phone = None  # Initialize phone variable
             full_name = ""
-        
+            
             # Try different arrangements
-        if len(parts) == 2:
+            if len(parts) == 2:
                 # "John Doe" "1234567890" or "John" "Doe 1234567890"
                 name_part = parts[0]
                 second_part = parts[1]
@@ -1136,7 +1136,7 @@ def bulk_import():
                     full_name = f"{parts[0]} {parts[1]}"
                     phone = None
                     
-        elif len(parts) >= 3:
+            elif len(parts) >= 3:
                 # "John" "Doe" "1234567890" or similar
                 phone_candidates = []
                 name_parts = []
@@ -1150,19 +1150,19 @@ def bulk_import():
                 
                 full_name = ' '.join(name_parts)
                 phone = phone_candidates[0] if phone_candidates else None
-        
-        if phone is None:
+            
+            if phone is None:
                 errors.append(f"Line {i}: Could not find phone number - '{line}'")
                 continue
                 
             # Format phone number
-        if len(phone) == 10:
+            if len(phone) == 10:
                 formatted_phone = f"+1{phone}"
-        elif len(phone) == 11 and phone.startswith('1'):
+            elif len(phone) == 11 and phone.startswith('1'):
                 formatted_phone = f"+{phone}"
-        else:
+            else:
                 formatted_phone = phone
-        
+            
             parsed_members.append({
                 'name': full_name,
                 'phone': formatted_phone,
@@ -1185,14 +1185,14 @@ def confirm_bulk_import():
     
     for i in range(member_count):
         if f'include_{i}' in request.form:  # Only add checked members
-        name = request.form.get(f'name_{i}')
-        phone = request.form.get(f'phone_{i}')
-        dues_amount = float(request.form.get(f'dues_{i}'))
-        payment_plan = request.form.get(f'plan_{i}')
-        
-        # TODO: Implement database version
-        # treasurer_app.add_member(name, phone, dues_amount, payment_plan)
-        added_count += 1
+            name = request.form.get(f'name_{i}')
+            phone = request.form.get(f'phone_{i}')
+            dues_amount = float(request.form.get(f'dues_{i}'))
+            payment_plan = request.form.get(f'plan_{i}')
+            
+            # TODO: Implement database version
+            # treasurer_app.add_member(name, phone, dues_amount, payment_plan)
+            added_count += 1
     
     flash(f'Successfully added {added_count} members!')
     return redirect(url_for('dashboard'))
@@ -1206,16 +1206,16 @@ def edit_member(member_id):
             # Database mode
             from models import Member as DBMember
             member = DBMember.query.get(int(member_id))
-        if not member:
+            if not member:
                 flash('Member not found!', 'error')
                 return redirect(url_for('dashboard'))
-        
+            
             # Generate payment schedule for display
             from datetime import datetime, timedelta
             payment_schedule = []
             total_paid = sum(p.amount for p in member.payments)
-        
-        if member.payment_plan == 'monthly':
+            
+            if member.payment_plan == 'monthly':
                 start_date = datetime.now()
                 monthly_amount = member.dues_amount / 4
                 for i in range(4):
