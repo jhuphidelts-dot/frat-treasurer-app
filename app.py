@@ -106,41 +106,41 @@ def send_email_to_sms(phone, message, config):
     
     for carrier, gateway in gateways_to_try:
         try:
-        sms_email = clean_phone + gateway
-        print(f"Attempting SMS via {carrier} to {sms_email}")
+            sms_email = clean_phone + gateway
+            print(f"Attempting SMS via {carrier} to {sms_email}")
         
-        # Create email message
-        msg = MIMEText(message)
-        msg['Subject'] = ''  # Empty subject for SMS
-        msg['From'] = config.smtp_username
-        msg['To'] = sms_email
+            # Create email message
+            msg = MIMEText(message)
+            msg['Subject'] = ''  # Empty subject for SMS
+            msg['From'] = config.smtp_username
+            msg['To'] = sms_email
         
-        # Send via SMTP with timeout settings
-        server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)  # 10 second timeout
-        server.set_debuglevel(0)  # Disable debug for production
-        server.starttls()
-        server.login(config.smtp_username, config.smtp_password)
-        server.send_message(msg)
-        server.quit()
+            # Send via SMTP with timeout settings
+            server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)  # 10 second timeout
+            server.set_debuglevel(0)  # Disable debug for production
+            server.starttls()
+            server.login(config.smtp_username, config.smtp_password)
+            server.send_message(msg)
+            server.quit()
         
-        success_count += 1
-        print(f"SMS sent successfully via {carrier}")
+            success_count += 1
+            print(f"SMS sent successfully via {carrier}")
         
-        # Don't try other gateways if one succeeds
-        break
+            # Don't try other gateways if one succeeds
+            break
         
         except smtplib.SMTPAuthenticationError as e:
-        print(f"SMS Error ({carrier}): Authentication failed - check Gmail app password")
-        last_error = f"Authentication failed: {str(e)}"
-        break  # No point trying other gateways if auth fails
+            print(f"SMS Error ({carrier}): Authentication failed - check Gmail app password")
+            last_error = f"Authentication failed: {str(e)}"
+            break  # No point trying other gateways if auth fails
         except smtplib.SMTPException as e:
-        print(f"SMS Error ({carrier}): SMTP error - {str(e)}")
-        last_error = f"SMTP error: {str(e)}"
-        continue  # Try next gateway
+            print(f"SMS Error ({carrier}): SMTP error - {str(e)}")
+            last_error = f"SMTP error: {str(e)}"
+            continue  # Try next gateway
         except Exception as e:
-        print(f"SMS Error ({carrier}): {str(e)}")
-        last_error = f"General error: {str(e)}"
-        continue  # Try next gateway
+            print(f"SMS Error ({carrier}): {str(e)}")
+            last_error = f"General error: {str(e)}"
+            continue  # Try next gateway
     
     if success_count == 0:
         print(f"SMS Failed: All gateways failed. Last error: {last_error}")
@@ -157,42 +157,42 @@ def notify_treasurer(message, config, notification_type="Alert"):
     # Send email to treasurer
     if config.email and config.smtp_username and config.smtp_password:
         try:
-        msg = MIMEText(f"Fraternity Treasurer {notification_type}:\n\n{message}")
-        msg['Subject'] = f'Fraternity Treasurer {notification_type}'
-        msg['From'] = config.smtp_username
-        msg['To'] = config.email
+            msg = MIMEText(f"Fraternity Treasurer {notification_type}:\n\n{message}")
+            msg['Subject'] = f'Fraternity Treasurer {notification_type}'
+            msg['From'] = config.smtp_username
+            msg['To'] = config.email
         
-        server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
-        server.starttls()
-        server.login(config.smtp_username, config.smtp_password)
-        server.send_message(msg)
-        server.quit()
-        sent = True
+            server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
+            server.starttls()
+            server.login(config.smtp_username, config.smtp_password)
+            server.send_message(msg)
+            server.quit()
+            sent = True
         except Exception:
-        pass
+            pass
     
     # Send SMS to treasurer
     if config.phone:
         # Create SMS-friendly message based on notification type
         if notification_type == "New Brother Registration":
-        # Extract key info for SMS
-        lines = message.split('\n')
-        name_line = next((line for line in lines if line.startswith('Name:')), '')
-        phone_line = next((line for line in lines if line.startswith('Phone:')), '')
-        
-        if name_line and phone_line:
+            # Extract key info for SMS
+            lines = message.split('\\n')
+            name_line = next((line for line in lines if line.startswith('Name:')), '')
+            phone_line = next((line for line in lines if line.startswith('Phone:')), '')
+            
+            if name_line and phone_line:
                 name = name_line.replace('Name: ', '')
                 phone = phone_line.replace('Phone: ', '')
                 sms_message = f"New brother: {name} ({phone}) registered. Check admin panel to verify."
-        else:
+            else:
                 sms_message = "New brother registration. Check admin panel."
         else:
-        # For other notification types, use the existing truncation
-        sms_message = f"Treasurer {notification_type}: {message[:100]}..." if len(message) > 100 else f"Treasurer {notification_type}: {message}"
+            # For other notification types, use the existing truncation
+            sms_message = f"Treasurer {notification_type}: {message[:100]}..." if len(message) > 100 else f"Treasurer {notification_type}: {message}"
         
-        print(f"📱 SMS Message ({len(sms_message)} chars): {sms_message}")
+            print(f"📱 SMS Message ({len(sms_message)} chars): {sms_message}")
         if send_email_to_sms(config.phone, sms_message, config):
-        sent = True
+            sent = True
     
     return sent
 
@@ -483,8 +483,8 @@ def get_current_user_role():
     if user_id:
         user = User.query.get(user_id)
         if user:
-        primary_role = user.get_primary_role()
-        return primary_role.name if primary_role else 'brother'
+            primary_role = user.get_primary_role()
+            return primary_role.name if primary_role else 'brother'
     
     return session.get('role', 'brother')
 
@@ -505,7 +505,7 @@ def get_user_member():
     if user_id:
         user = User.query.get(user_id)
         if user and user.member_record:
-        return user.member_record
+            return user.member_record
     return None
 
 def require_permission(permission_name):
@@ -514,10 +514,10 @@ def require_permission(permission_name):
         from functools import wraps
         @wraps(f)
         def decorated_function(*args, **kwargs):
-        if not has_permission(permission_name):
+            if not has_permission(permission_name):
                 flash(f'You do not have permission to {permission_name.replace("_", " ")}. This action is restricted to treasurers only.', 'error')
                 return redirect(url_for('dashboard'))
-        return f(*args, **kwargs)
+            return f(*args, **kwargs)
         return decorated_function
     return decorator
 
@@ -538,9 +538,9 @@ BUDGET_CATEGORIES = [
 def require_auth(f):
     def decorated_function(*args, **kwargs):
         if 'user' not in session:
-        flash('Please log in to access this page')
-        return redirect(url_for('login'))
-        return f(*args, **kwargs)
+            flash('Please log in to access this page')
+            return redirect(url_for('login'))
+            return f(*args, **kwargs)
     decorated_function.__name__ = f.__name__
     return decorated_function
 
@@ -559,19 +559,19 @@ def authenticate_user(username, password):
         
         # Check for admin username
         if username == 'admin':
-        user = User.query.filter_by(phone='admin').first()
+            user = User.query.filter_by(phone='admin').first()
         else:
-        # Check by phone or email
-        user = User.query.filter_by(phone=username).first()
-        if not user:
+            # Check by phone or email
+            user = User.query.filter_by(phone=username).first()
+            if not user:
                 user = User.query.filter_by(email=username).first()
         
         if user and user.check_password(password):
-        primary_role = user.get_primary_role()
-        role_name = primary_role.name if primary_role else 'brother'
-        return user, role_name
+            primary_role = user.get_primary_role()
+            role_name = primary_role.name if primary_role else 'brother'
+            return user, role_name
         
-        return None, None
+            return None, None
     except Exception as e:
         print(f"❌ Authentication error: {e}")
         return None, None
@@ -589,20 +589,20 @@ def login():
         user, role = authenticate_user(username, password)
         
         if user:
-        login_user(user, remember=True)
-        session['user'] = user.phone
-        session['role'] = role
-        session['user_id'] = user.id
-        flash(f'Welcome, {user.first_name}!')
-        
-        # Redirect based on role
-        if role == 'brother':
+            login_user(user, remember=True)
+            session['user'] = user.phone
+            session['role'] = role
+            session['user_id'] = user.id
+            flash(f'Welcome, {user.first_name}!')
+            
+            # Redirect based on role
+            if role == 'brother':
                 return redirect(url_for('brother_dashboard'))
-        else:
+            else:
                 return redirect(url_for('dashboard'))
         else:
-        flash('Invalid username or password')
-        return redirect(url_for('login'))
+            flash('Invalid username or password')
+            return redirect(url_for('login'))
     
     except Exception as e:
         print(f"❌ Login error: {e}")
@@ -653,8 +653,8 @@ def monthly_income():
         monthly_data = {}
         
         for payment in payments:
-        month_key = payment.date.strftime('%Y-%m')
-        month_name = payment.date.strftime('%B %Y')
+            month_key = payment.date.strftime('%Y-%m')
+            month_name = payment.date.strftime('%B %Y')
         
         if month_key not in monthly_data:
                 monthly_data[month_key] = {
@@ -663,12 +663,12 @@ def monthly_income():
                     'transaction_count': 0
                 }
         
-        monthly_data[month_key]['total_amount'] += payment.amount
-        monthly_data[month_key]['transaction_count'] += 1
+            monthly_data[month_key]['total_amount'] += payment.amount
+            monthly_data[month_key]['transaction_count'] += 1
         
-        print(f"🔍 Monthly data: {len(monthly_data)} months from database")
+            print(f"🔍 Monthly data: {len(monthly_data)} months from database")
         
-        return render_template('monthly_income.html', monthly_data=monthly_data)
+            return render_template('monthly_income.html', monthly_data=monthly_data)
     except Exception as e:
         print(f"❌ Monthly income error: {e}")
         import traceback
@@ -682,9 +682,9 @@ def landing_page():
     if 'user' in session:
         # Redirect to appropriate dashboard based on role
         if session.get('role') == 'brother':
-        return redirect(url_for('brother_dashboard'))
+            return redirect(url_for('brother_dashboard'))
         else:
-        return redirect(url_for('dashboard'))
+            return redirect(url_for('dashboard'))
     
     # Show login page for unauthenticated users
     return redirect(url_for('login'))
@@ -705,70 +705,70 @@ def dashboard():
         print(f"🔍 Found {len(db_members)} members")
         
         for member in db_members:
-        # Calculate total paid for this member
-        total_paid = sum(payment.amount for payment in member.payments)
+            # Calculate total paid for this member
+            total_paid = sum(payment.amount for payment in member.payments)
         
-        print(f"🔍 {member.name}: ${member.dues_amount} dues, ${total_paid} paid, ${member.dues_amount - total_paid} balance")
+            print(f"🔍 {member.name}: ${member.dues_amount} dues, ${total_paid} paid, ${member.dues_amount - total_paid} balance")
         
-        # Add payment info to member object for template display with multiple attribute names
-        member.total_paid = total_paid
-        member.balance = member.dues_amount - total_paid
-        member.paid = total_paid  # Template might expect 'paid' attribute
-        member.amount_paid = total_paid  # Another possible attribute name
+            # Add payment info to member object for template display with multiple attribute names
+            member.total_paid = total_paid
+            member.balance = member.dues_amount - total_paid
+            member.paid = total_paid  # Template might expect 'paid' attribute
+            member.amount_paid = total_paid  # Another possible attribute name
         
-        members[str(member.id)] = member
+            members[str(member.id)] = member
         
-        # Calculate dues summary from database
-        print("🔍 Calculating dues summary...")
-        total_projected = sum(member.dues_amount for member in db_members)
-        total_collected = 0.0
+            # Calculate dues summary from database
+            print("🔍 Calculating dues summary...")
+            total_projected = sum(member.dues_amount for member in db_members)
+            total_collected = 0.0
         
-        # Sum all payments made by all members
+            # Sum all payments made by all members
         for member in db_members:
-        try:
+            try:
                 member_payments = sum(payment.amount for payment in member.payments)
                 total_collected += member_payments
                 print(f"🔍 {member.name}: ${member_payments} paid of ${member.dues_amount} due")
         except Exception as e:
                 print(f"⚠️ Error calculating payments for {member.name}: {e}")
         
-        outstanding = total_projected - total_collected
-        collection_rate = (total_collected / total_projected * 100) if total_projected > 0 else 0
+            outstanding = total_projected - total_collected
+            collection_rate = (total_collected / total_projected * 100) if total_projected > 0 else 0
         
-        print(f"🔍 Totals: projected=${total_projected}, collected=${total_collected}, outstanding=${outstanding}")
+            print(f"🔍 Totals: projected=${total_projected}, collected=${total_collected}, outstanding=${outstanding}")
         
-        dues_summary = {
-        'total_collected': total_collected,
-        'total_projected': total_projected, 
-        'outstanding': outstanding,
-        'collection_rate': collection_rate
-        }
+            dues_summary = {
+            'total_collected': total_collected,
+            'total_projected': total_projected, 
+            'outstanding': outstanding,
+            'collection_rate': collection_rate
+            }
         
-        # Get budget summary from database - format to match template expectations
-        budget_summary = {}
-        budget_limits = BudgetLimit.query.all()
+            # Get budget summary from database - format to match template expectations
+            budget_summary = {}
+            budget_limits = BudgetLimit.query.all()
         
         for limit in budget_limits:
-        # Calculate spending for this category
-        expense_transactions = Transaction.query.filter_by(type='expense', category=limit.category).all()
-        spent = sum(t.amount for t in expense_transactions)
-        remaining = limit.amount - spent
-        percent_used = (spent / limit.amount * 100) if limit.amount > 0 else 0
+            # Calculate spending for this category
+            expense_transactions = Transaction.query.filter_by(type='expense', category=limit.category).all()
+            spent = sum(t.amount for t in expense_transactions)
+            remaining = limit.amount - spent
+            percent_used = (spent / limit.amount * 100) if limit.amount > 0 else 0
         
-        print(f"🔍 Budget {limit.category}: ${limit.amount} limit, ${spent} spent ({len(expense_transactions)} transactions), ${remaining} remaining")
+            print(f"🔍 Budget {limit.category}: ${limit.amount} limit, ${spent} spent ({len(expense_transactions)} transactions), ${remaining} remaining")
         
-        # Create object-like dict that matches template expectations
-        budget_summary[limit.category] = {
+            # Create object-like dict that matches template expectations
+            budget_summary[limit.category] = {
                 'budget_limit': limit.amount,  # Template expects 'budget_limit' attribute
                 'spent': spent,
                 'remaining': remaining,
                 'percent_used': percent_used,  # Template expects 'percent_used' attribute
                 'limit': limit.amount,  # Also include 'limit' for backward compatibility
                 'amount': spent  # Template might expect 'amount' for spent
-        }
+            }
         
-        print(f"🔍 Rendering dashboard with {len(members)} members")
-        return render_template('index.html',
+            print(f"🔍 Rendering dashboard with {len(members)} members")
+            return render_template('index.html',
                              members=members,
                              budget_summary=budget_summary,
                              dues_summary=dues_summary,
@@ -910,22 +910,22 @@ def record_payment():
         # Find the member
         member = DBMember.query.get(int(member_id))
         if not member:
-        flash('Member not found!', 'error')
-        return redirect(url_for('dashboard'))
+            flash('Member not found!', 'error')
+            return redirect(url_for('dashboard'))
         
-        # Create payment record
-        payment = Payment(
-        member_id=int(member_id),
-        amount=amount,
-        payment_method=payment_method,
-        date=datetime.now().date()
-        )
+            # Create payment record
+            payment = Payment(
+            member_id=int(member_id),
+            amount=amount,
+            payment_method=payment_method,
+            date=datetime.now().date()
+            )
         
-        db.session.add(payment)
-        db.session.commit()
+            db.session.add(payment)
+            db.session.commit()
         
-        print(f"✅ Payment recorded in database: {member.name} paid ${amount} via {payment_method}")
-        flash('Payment recorded successfully!', 'success')
+            print(f"✅ Payment recorded in database: {member.name} paid ${amount} via {payment_method}")
+            flash('Payment recorded successfully!', 'success')
         
     except Exception as e:
         db.session.rollback()
@@ -1001,9 +1001,9 @@ def send_reminders():
         # reminders_sent = treasurer_app.check_and_send_reminders()
         
         if reminders_sent > 0:
-        flash(f'✅ {reminders_sent} payment reminders sent successfully!', 'success')
+            flash(f'✅ {reminders_sent} payment reminders sent successfully!', 'success')
         else:
-        flash('ℹ️ No reminders needed - all members are paid up!', 'info')
+            flash('ℹ️ No reminders needed - all members are paid up!', 'info')
         
     except Exception as e:
         print(f"Reminder error: {e}")
@@ -1046,9 +1046,9 @@ def selective_reminders():
         # reminders_sent = treasurer_app.check_and_send_reminders(selected_members)
         
         if reminders_sent > 0:
-        flash(f'✅ Reminders sent to {reminders_sent} selected member(s)!', 'success')
+            flash(f'✅ Reminders sent to {reminders_sent} selected member(s)!', 'success')
         else:
-        flash('ℹ️ No reminders sent - check member balances.', 'info')
+            flash('ℹ️ No reminders sent - check member balances.', 'info')
         
     except Exception as e:
         print(f"Selective reminder error: {e}")
@@ -1075,7 +1075,7 @@ def budget_summary():
     transactions = Transaction.query.filter_by(type='expense').all()
     for transaction in transactions:
         if transaction.category in budget_data:
-        budget_data[transaction.category]['spent'] += transaction.amount
+            budget_data[transaction.category]['spent'] += transaction.amount
     
     # Calculate remaining amounts
     for category, data in budget_data.items():
@@ -1102,20 +1102,20 @@ def bulk_import():
     for i, line in enumerate(lines, 1):
         line = line.strip()
         if not line:
-        continue
+            continue
         
-        # Try to parse different formats
-        parts = [part.strip() for part in line.split('\t') if part.strip()]  # Tab-separated
+            # Try to parse different formats
+            parts = [part.strip() for part in line.split('\t') if part.strip()]  # Tab-separated
         if len(parts) < 2:
-        parts = [part.strip() for part in line.split(',') if part.strip()]  # Comma-separated
+            parts = [part.strip() for part in line.split(',') if part.strip()]  # Comma-separated
         if len(parts) < 2:
-        parts = line.split()  # Space-separated
+            parts = line.split()  # Space-separated
         
         if len(parts) >= 2:
-        phone = None  # Initialize phone variable
-        full_name = ""
+            phone = None  # Initialize phone variable
+            full_name = ""
         
-        # Try different arrangements
+            # Try different arrangements
         if len(parts) == 2:
                 # "John Doe" "1234567890" or "John" "Doe 1234567890"
                 name_part = parts[0]
@@ -1155,7 +1155,7 @@ def bulk_import():
                 errors.append(f"Line {i}: Could not find phone number - '{line}'")
                 continue
                 
-        # Format phone number
+            # Format phone number
         if len(phone) == 10:
                 formatted_phone = f"+1{phone}"
         elif len(phone) == 11 and phone.startswith('1'):
@@ -1163,12 +1163,12 @@ def bulk_import():
         else:
                 formatted_phone = phone
         
-        parsed_members.append({
+            parsed_members.append({
                 'name': full_name,
                 'phone': formatted_phone,
                 'dues_amount': default_dues,
                 'payment_plan': default_payment_plan
-        })
+            })
     
     return render_template('bulk_import.html', 
                          parsed_members=parsed_members, 
@@ -1203,17 +1203,17 @@ def confirm_bulk_import():
 def edit_member(member_id):
     try:
         if request.method == 'GET':
-        # Database mode
-        from models import Member as DBMember
-        member = DBMember.query.get(int(member_id))
+            # Database mode
+            from models import Member as DBMember
+            member = DBMember.query.get(int(member_id))
         if not member:
                 flash('Member not found!', 'error')
                 return redirect(url_for('dashboard'))
         
-        # Generate payment schedule for display
-        from datetime import datetime, timedelta
-        payment_schedule = []
-        total_paid = sum(p.amount for p in member.payments)
+            # Generate payment schedule for display
+            from datetime import datetime, timedelta
+            payment_schedule = []
+            total_paid = sum(p.amount for p in member.payments)
         
         if member.payment_plan == 'monthly':
                 start_date = datetime.now()
@@ -1263,41 +1263,41 @@ def edit_member(member_id):
                         'amount_due': max(0, bimonthly_amount - period_paid)
                     })
         
-        return render_template('edit_member.html', 
+            return render_template('edit_member.html', 
                                  member=member,
                                  payment_schedule=payment_schedule)
         
-        # POST request - update member
-        name = request.form['name']
-        contact = request.form.get('contact', request.form.get('phone', ''))  # Support both field names
-        dues_amount = float(request.form['dues_amount'])
-        payment_plan = request.form['payment_plan']
-        role = request.form.get('role', 'brother')  # Get role assignment
+            # POST request - update member
+            name = request.form['name']
+            contact = request.form.get('contact', request.form.get('phone', ''))  # Support both field names
+            dues_amount = float(request.form['dues_amount'])
+            payment_plan = request.form['payment_plan']
+            role = request.form.get('role', 'brother')  # Get role assignment
         
-        # Database mode
-        from models import Member as DBMember
-        member = DBMember.query.get(int(member_id))
+            # Database mode
+            from models import Member as DBMember
+            member = DBMember.query.get(int(member_id))
         if not member:
-        flash('Member not found!', 'error')
-        return redirect(url_for('dashboard'))
+            flash('Member not found!', 'error')
+            return redirect(url_for('dashboard'))
         
-        member.name = name
-        member.contact = contact
-        member.dues_amount = dues_amount
-        member.payment_plan = payment_plan
-        member.role = role
+            member.name = name
+            member.contact = contact
+            member.dues_amount = dues_amount
+            member.payment_plan = payment_plan
+            member.role = role
         
-        try:
-        db.session.commit()
-        flash(f'Member {name} updated successfully!')
-        print(f"✅ Member {name} updated successfully in database")
+            try:
+            db.session.commit()
+            flash(f'Member {name} updated successfully!')
+            print(f"✅ Member {name} updated successfully in database")
         except Exception as e:
-        db.session.rollback()
-        flash(f'Error updating member: {e}', 'error')
-        print(f"❌ Error updating member: {e}")
-        return redirect(url_for('dashboard'))
+            db.session.rollback()
+            flash(f'Error updating member: {e}', 'error')
+            print(f"❌ Error updating member: {e}")
+            return redirect(url_for('dashboard'))
         
-        return redirect(url_for('member_details', member_id=member_id))
+            return redirect(url_for('member_details', member_id=member_id))
     
     except Exception as e:
         print(f"❌ Edit member error: {e}")
@@ -1318,7 +1318,7 @@ def remove_member(member_id):
         # if treasurer_app.remove_member(member_id):
         flash(f'Member {member_name} removed successfully!')
         else:
-        flash('Error removing member!')
+            flash('Error removing member!')
     return redirect(url_for('dashboard'))
 
 @app.route('/member_details/<member_id>')
@@ -1330,17 +1330,17 @@ def member_details(member_id):
         from models import Member as DBMember, Payment
         
         try:
-        member = DBMember.query.get(int(member_id))
+            member = DBMember.query.get(int(member_id))
         if not member:
                 flash('Member not found!', 'error')
                 return redirect(url_for('dashboard'))
         
-        # Calculate balance from payments
-        total_paid = sum(payment.amount for payment in member.payments)
-        balance = member.dues_amount - total_paid
+            # Calculate balance from payments
+            total_paid = sum(payment.amount for payment in member.payments)
+            balance = member.dues_amount - total_paid
         
-        # Format payments for template (database mode uses different structure)
-        formatted_payments = []
+            # Format payments for template (database mode uses different structure)
+            formatted_payments = []
         for payment in member.payments:
                 formatted_payments.append({
                     'id': payment.id,
@@ -1349,12 +1349,12 @@ def member_details(member_id):
                     'date': payment.date.strftime('%Y-%m-%d') if hasattr(payment.date, 'strftime') else str(payment.date)
                 })
         
-        # Add payments_made attribute for template compatibility
-        member.payments_made = formatted_payments
-        member.phone = member.contact  # Template expects 'phone' attribute
+            # Add payments_made attribute for template compatibility
+            member.payments_made = formatted_payments
+            member.phone = member.contact  # Template expects 'phone' attribute
         
-        # Generate payment schedule based on payment plan
-        payment_schedule = []
+            # Generate payment schedule based on payment plan
+            payment_schedule = []
         if member.payment_plan == 'monthly':
                 # Generate 4 monthly payments
                 start_date = datetime.now()
@@ -1415,16 +1415,16 @@ def member_details(member_id):
                         'amount_due': max(0, bimonthly_amount - period_paid)
                     })
         
-        return render_template('member_details.html',
+            return render_template('member_details.html',
                                  member=member,
                                  payment_schedule=payment_schedule,
                                  balance=balance)
         except Exception as e:
-        print(f"❌ Error loading member details: {e}")
-        import traceback
-        print(f"❌ Traceback: {traceback.format_exc()}")
-        flash(f'Error loading member details: {e}', 'error')
-        return redirect(url_for('dashboard'))
+            print(f"❌ Error loading member details: {e}")
+            import traceback
+            print(f"❌ Traceback: {traceback.format_exc()}")
+            flash(f'Error loading member details: {e}', 'error')
+            return redirect(url_for('dashboard'))
 @app.route('/budget_management', methods=['GET', 'POST'])
 @require_auth
 @require_permission('manage_budgets')
@@ -1496,19 +1496,19 @@ def budget_management():
         
         # POST request - update budget limits
         if not treasurer_app:
-        print(f"❌ Treasurer app is None in POST")
-        flash('Application not properly initialized', 'error')
-        return redirect(url_for('dashboard'))
+            print(f"❌ Treasurer app is None in POST")
+            flash('Application not properly initialized', 'error')
+            return redirect(url_for('dashboard'))
         
         for category in BUDGET_CATEGORIES:
-        amount_key = f'budget_{category.replace("(", "_").replace(")", "_").replace(" ", "_").replace(",", "")}'
+            amount_key = f'budget_{category.replace("(", "_").replace(")", "_").replace(" ", "_").replace(",", "")}'
         if amount_key in request.form:
                 amount = float(request.form[amount_key] or 0)
                 # TODO: Implement database version
                 # treasurer_app.update_budget_limit(category, amount)
         
-        flash('Budget limits updated successfully!')
-        return redirect(url_for('budget_management'))
+            flash('Budget limits updated successfully!')
+            return redirect(url_for('budget_management'))
     except Exception as e:
         print(f"❌ Budget management POST error: {e}")
         import traceback
@@ -1573,7 +1573,7 @@ def custom_payment_schedule(member_id):
         description = request.form.get(f'description_{i}')
         
         if due_date and amount and description:
-        try:
+            try:
                 # Validate date format and convert to ISO format
                 parsed_date = datetime.strptime(due_date, '%Y-%m-%d')
                 custom_schedule.append({
@@ -1620,30 +1620,30 @@ def dues_summary_page():
                     'payments_made': [{'amount': p.amount, 'date': p.date.strftime('%Y-%m-%d'), 'method': p.payment_method} for p in member.payments]
                 }
         
-        # Calculate dues summary
-        total_projected = sum(member.dues_amount for member in db_members)
-        total_collected = sum(sum(payment.amount for payment in member.payments) for member in db_members)
-        outstanding = total_projected - total_collected
-        collection_rate = (total_collected / total_projected * 100) if total_projected > 0 else 0
-        members_paid_up = sum(1 for member in db_members if sum(payment.amount for payment in member.payments) >= member.dues_amount)
-        members_outstanding = len(db_members) - members_paid_up
+            # Calculate dues summary
+            total_projected = sum(member.dues_amount for member in db_members)
+            total_collected = sum(sum(payment.amount for payment in member.payments) for member in db_members)
+            outstanding = total_projected - total_collected
+            collection_rate = (total_collected / total_projected * 100) if total_projected > 0 else 0
+            members_paid_up = sum(1 for member in db_members if sum(payment.amount for payment in member.payments) >= member.dues_amount)
+            members_outstanding = len(db_members) - members_paid_up
         
-        dues_summary = {
+            dues_summary = {
                 'total_collected': total_collected,
                 'total_projected': total_projected,
                 'outstanding': outstanding,
                 'collection_rate': collection_rate,
                 'members_paid_up': members_paid_up,
                 'members_outstanding': members_outstanding
-        }
+            }
         
         else:
-        print("❌ No data source available")
-        dues_summary = {'total_collected': 0.0, 'total_projected': 0.0, 'outstanding': 0.0, 'collection_rate': 0.0, 'members_paid_up': 0, 'members_outstanding': 0}
-        members = {}
+            print("❌ No data source available")
+            dues_summary = {'total_collected': 0.0, 'total_projected': 0.0, 'outstanding': 0.0, 'collection_rate': 0.0, 'members_paid_up': 0, 'members_outstanding': 0}
+            members = {}
         
-        print(f"🔍 Dues summary loaded: {dues_summary}")
-        return render_template('dues_summary.html',
+            print(f"🔍 Dues summary loaded: {dues_summary}")
+            return render_template('dues_summary.html',
                              dues_summary=dues_summary,
                              members=members)
     except Exception as e:
@@ -1682,10 +1682,10 @@ def transactions():
                     'type': 'transaction'
                 })
         
-        # Get all payments as income transactions
-        print("🔍 Querying payments...")
-        db_payments = Payment.query.order_by(Payment.date.desc()).all()
-        print(f"🔍 Found {len(db_payments)} payments")
+            # Get all payments as income transactions
+            print("🔍 Querying payments...")
+            db_payments = Payment.query.order_by(Payment.date.desc()).all()
+            print(f"🔍 Found {len(db_payments)} payments")
         
         for payment in db_payments:
                 all_items.append({
@@ -1700,13 +1700,13 @@ def transactions():
                     'member_name': payment.member.name
                 })
         
-        # Sort all items by date (newest first)
-        all_items.sort(key=lambda x: x['date'] if x['date'] != 'Ongoing' else '1900-01-01', reverse=True)
+            # Sort all items by date (newest first)
+            all_items.sort(key=lambda x: x['date'] if x['date'] != 'Ongoing' else '1900-01-01', reverse=True)
         
-        # Get outstanding dues (members with unpaid balances)
-        print("🔍 Querying members for outstanding dues...")
-        members = Member.query.all()
-        print(f"🔍 Found {len(members)} members")
+            # Get outstanding dues (members with unpaid balances)
+            print("🔍 Querying members for outstanding dues...")
+            members = Member.query.all()
+            print(f"🔍 Found {len(members)} members")
         
         for member in members:
                 try:
@@ -1726,42 +1726,42 @@ def transactions():
                 except Exception as e:
                     print(f"⚠️ Error processing member {member.name}: {e}")
         
-        # Calculate totals avoiding double-counting of dues collection
-        # Get income from actual transactions (excluding Dues Collection to avoid double-counting payments)
-        transaction_income = sum(item['amount'] for item in all_items 
+            # Calculate totals avoiding double-counting of dues collection
+            # Get income from actual transactions (excluding Dues Collection to avoid double-counting payments)
+            transaction_income = sum(item['amount'] for item in all_items 
                                    if item['transaction_type'] == 'income' and item['type'] == 'transaction' and item['category'] != 'Dues Collection')
         
-        # Get income from payments (these are the actual dues collected)
-        payment_income = sum(item['amount'] for item in all_items 
+            # Get income from payments (these are the actual dues collected)
+            payment_income = sum(item['amount'] for item in all_items 
                                if item['transaction_type'] == 'income' and item['type'] == 'payment')
         
-        # Include any manual "Dues Collection" transactions (but this might be double-counting)
-        dues_transactions = sum(item['amount'] for item in all_items 
+            # Include any manual "Dues Collection" transactions (but this might be double-counting)
+            dues_transactions = sum(item['amount'] for item in all_items 
                                   if item['transaction_type'] == 'income' and item['type'] == 'transaction' and item['category'] == 'Dues Collection')
         
-        # Total income = other income transactions + payment records
-        # (We exclude manual dues collection transactions to prevent double-counting with payment records)
-        total_income = transaction_income + payment_income
+            # Total income = other income transactions + payment records
+            # (We exclude manual dues collection transactions to prevent double-counting with payment records)
+            total_income = transaction_income + payment_income
         
-        total_expenses = sum(item['amount'] for item in all_items 
+            total_expenses = sum(item['amount'] for item in all_items 
                                 if item['transaction_type'] == 'expense')
-        total_outstanding = sum(item['amount'] for item in all_items 
+            total_outstanding = sum(item['amount'] for item in all_items 
                                    if item['transaction_type'] == 'outstanding')
         
-        # Calculate net position (all money in - all money out)
-        net_position = total_income - total_expenses
+            # Calculate net position (all money in - all money out)
+            net_position = total_income - total_expenses
         
-        print(f"🔍 Income breakdown: transaction_income=${transaction_income}, payment_income=${payment_income}, dues_transactions=${dues_transactions}")
+            print(f"🔍 Income breakdown: transaction_income=${transaction_income}, payment_income=${payment_income}, dues_transactions=${dues_transactions}")
         
-        print(f"🔍 Totals: income={total_income}, expenses={total_expenses}, outstanding={total_outstanding}")
+            print(f"🔍 Totals: income={total_income}, expenses={total_expenses}, outstanding={total_outstanding}")
         
         else:
-        print("🔍 No data source available")
-        all_items = []
-        total_income = total_expenses = total_outstanding = net_position = 0
+            print("🔍 No data source available")
+            all_items = []
+            total_income = total_expenses = total_outstanding = net_position = 0
         
-        print(f"🔍 Rendering template with {len(all_items)} items")
-        return render_template('transactions.html',
+            print(f"🔍 Rendering template with {len(all_items)} items")
+            return render_template('transactions.html',
                              transactions=all_items,
                              total_income=total_income,
                              total_expenses=total_expenses,
@@ -1808,30 +1808,30 @@ def treasurer_setup():
                     smtp_password: str = ''
                 config = MockConfig()
                 
-        return render_template('treasurer_setup.html', config=config)
+            return render_template('treasurer_setup.html', config=config)
         
-        # POST - Update treasurer configuration
-        # Database mode
-        from models import TreasurerConfig
-        config = TreasurerConfig.query.first()
+            # POST - Update treasurer configuration
+            # Database mode
+            from models import TreasurerConfig
+            config = TreasurerConfig.query.first()
         if not config:
                 config = TreasurerConfig()
                 db.session.add(config)
         
-        config.name = request.form.get('name', '')
-        config.email = request.form.get('email', '')
-        config.phone = request.form.get('phone', '')
-        config.smtp_username = request.form.get('smtp_username', '')
-        config.smtp_password = request.form.get('smtp_password', '')
+            config.name = request.form.get('name', '')
+            config.email = request.form.get('email', '')
+            config.phone = request.form.get('phone', '')
+            config.smtp_username = request.form.get('smtp_username', '')
+            config.smtp_password = request.form.get('smtp_password', '')
         
-        db.session.commit()
+            db.session.commit()
         
         else:
-        flash('Configuration cannot be saved - no data source available', 'error')
-        return redirect(url_for('dashboard'))
+            flash('Configuration cannot be saved - no data source available', 'error')
+            return redirect(url_for('dashboard'))
         
-        flash('Treasurer configuration updated successfully!')
-        return redirect(url_for('treasurer_setup'))
+            flash('Treasurer configuration updated successfully!')
+            return redirect(url_for('treasurer_setup'))
         
     except Exception as e:
         print(f"❌ Treasurer setup error: {e}")
@@ -1908,7 +1908,7 @@ def semester_management():
                 semesters = []
                 current_semester = None
                 
-        return render_template('semester_management.html', semesters=semesters, current_semester=current_semester)
+            return render_template('semester_management.html', semesters=semesters, current_semester=current_semester)
     except Exception as e:
         print(f"❌ Semester management error: {e}")
         import traceback
@@ -1918,35 +1918,35 @@ def semester_management():
         
         # POST - Create new semester
         if not treasurer_app:
-        print(f"❌ Treasurer app is None in POST")
-        flash('Application not properly initialized', 'error')
-        return redirect(url_for('dashboard'))
+            print(f"❌ Treasurer app is None in POST")
+            flash('Application not properly initialized', 'error')
+            return redirect(url_for('dashboard'))
         
-        season = request.form.get('season')
-        year = int(request.form.get('year'))
+            season = request.form.get('season')
+            year = int(request.form.get('year'))
         
-        # Archive current semester
-        # TODO: Implement database version
-        # if treasurer_app.current_semester:
-        # TODO: Implement database version
-        # treasurer_app.current_semester.is_current = False
-        # TODO: Implement database version
-        # treasurer_app.current_semester.end_date = datetime.now().isoformat()
+            # Archive current semester
+            # TODO: Implement database version
+            # if treasurer_app.current_semester:
+            # TODO: Implement database version
+            # treasurer_app.current_semester.is_current = False
+            # TODO: Implement database version
+            # treasurer_app.current_semester.end_date = datetime.now().isoformat()
         
-        # Create new semester
-        semester_id = f"{season.lower()}_{year}"
-        new_semester = Semester(id=semester_id, name=f"{season} {year}", year=year, season=season, 
+            # Create new semester
+            semester_id = f"{season.lower()}_{year}"
+            new_semester = Semester(id=semester_id, name=f"{season} {year}", year=year, season=season, 
                                start_date=datetime.now().isoformat(), end_date="", is_current=True)
         
-        # TODO: Implement database version
-        # treasurer_app.semesters[semester_id] = new_semester
-        # TODO: Implement database version
-        # treasurer_app.current_semester = new_semester
-        # TODO: Implement database version
-        # treasurer_app.save_data(treasurer_app.semesters_file, treasurer_app.semesters)
+            # TODO: Implement database version
+            # treasurer_app.semesters[semester_id] = new_semester
+            # TODO: Implement database version
+            # treasurer_app.current_semester = new_semester
+            # TODO: Implement database version
+            # treasurer_app.save_data(treasurer_app.semesters_file, treasurer_app.semesters)
         
-        flash(f'New semester {season} {year} created!')
-        return redirect(url_for('semester_management'))
+            flash(f'New semester {season} {year} created!')
+            return redirect(url_for('semester_management'))
     except Exception as e:
         print(f"❌ Semester management POST error: {e}")
         import traceback
@@ -2142,21 +2142,21 @@ def notifications_dashboard():
                 }
                 
         else:
-        print("❌ No data source available")
-        notification_status = {
+            print("❌ No data source available")
+            notification_status = {
                 'email_configured': False,
                 'treasurer_phone_configured': False,
                 'email_username': '',
                 'treasurer_phone': ''
-        }
+            }
         
-        print(f"🔍 Notification status: {notification_status}")
+            print(f"🔍 Notification status: {notification_status}")
         
-        # TODO: In the future, you could add pending approval requests here
-        # For example:
-        # pending_requests = get_pending_approval_requests()
+            # TODO: In the future, you could add pending approval requests here
+            # For example:
+            # pending_requests = get_pending_approval_requests()
         
-        return render_template('notifications_dashboard.html',
+            return render_template('notifications_dashboard.html',
                              notification_status=notification_status)
     except Exception as e:
         print(f"❌ Notifications dashboard error: {e}")
@@ -2191,8 +2191,8 @@ def brother_registration():
     # TODO: Implement database version
     # for pending in treasurer_app.pending_brothers.values():
         if pending.email.lower() == email:
-        flash('Registration with this email is already pending approval.', 'warning')
-        return render_template('brother_registration.html')
+            flash('Registration with this email is already pending approval.', 'warning')
+            return render_template('brother_registration.html')
     
     # Register the brother
     try:
@@ -2295,8 +2295,8 @@ def brother_dashboard():
         
         member = MockMember()
         else:
-        flash('Member information not found. Please contact the treasurer.', 'error')
-        return redirect(url_for('logout'))
+            flash('Member information not found. Please contact the treasurer.', 'error')
+            return redirect(url_for('logout'))
     
     # Get summary data based on system type
         # Database mode - use SQLAlchemy models
@@ -2361,7 +2361,7 @@ def credential_management():
         users = User.query.all()
         total_users = len(users)
         for user in users:
-        is_brother = any(r.name == 'brother' for r in user.roles) or (user.get_primary_role() and user.get_primary_role().name == 'brother')
+            is_brother = any(r.name == 'brother' for r in user.roles) or (user.get_primary_role() and user.get_primary_role().name == 'brother')
         if is_brother:
                 brother_accounts += 1
                 member = getattr(user, 'member_record', None)
@@ -2409,10 +2409,10 @@ def verify_brothers():
                                      pending_users=pending_users,
                                      members=members)
         
-        # POST request - handle approval/rejection
-        user_id = request.form.get('user_id')
-        member_id = request.form.get('member_id')
-        action = request.form.get('action')
+            # POST request - handle approval/rejection
+            user_id = request.form.get('user_id')
+            member_id = request.form.get('member_id')
+            action = request.form.get('action')
         
         if action == 'approve' and user_id:
                 user = User.query.get(user_id)
@@ -2454,42 +2454,42 @@ def verify_brothers():
                 else:
                     flash('User not found!', 'error')
         
-        return redirect(url_for('verify_brothers'))
+            return redirect(url_for('verify_brothers'))
         
         if not treasurer_app:
-        flash('Application not properly initialized for brother verification.', 'error')
-        return redirect(url_for('dashboard'))
+            flash('Application not properly initialized for brother verification.', 'error')
+            return redirect(url_for('dashboard'))
         
         if request.method == 'GET':
-        # Force reload pending brothers from disk
-        # TODO: Implement database version
-        # treasurer_app.pending_brothers = treasurer_app.load_data(treasurer_app.pending_brothers_file, {})
-        print(f"\n👥 VERIFY BROTHERS PAGE LOAD")
-        # TODO: Implement database version
-        # print(f"   Pending brothers count: {len(treasurer_app.pending_brothers)}")
+            # Force reload pending brothers from disk
+            # TODO: Implement database version
+            # treasurer_app.pending_brothers = treasurer_app.load_data(treasurer_app.pending_brothers_file, {})
+            print(f"\n👥 VERIFY BROTHERS PAGE LOAD")
+            # TODO: Implement database version
+            # print(f"   Pending brothers count: {len(treasurer_app.pending_brothers)}")
         
-        return render_template('verify_brothers.html',
+            return render_template('verify_brothers.html',
                                  # TODO: Implement database version
                                  # pending_brothers=treasurer_app.pending_brothers,
                                  # TODO: Implement database version
                                  # members=treasurer_app.members)
         
-        # POST request - process verification
-        pending_id = request.form.get('pending_id')
-        member_id = request.form.get('member_id')
-        action = request.form.get('action')
+            # POST request - process verification
+            pending_id = request.form.get('pending_id')
+            member_id = request.form.get('member_id')
+            action = request.form.get('action')
         
         if action == 'verify' and pending_id and member_id:
-        # TODO: Implement database version
-        # success, message = treasurer_app.verify_brother_with_member(pending_id, member_id)
+            # TODO: Implement database version
+            # success, message = treasurer_app.verify_brother_with_member(pending_id, member_id)
         if success:
                 flash(message, 'success')
         else:
                 flash(message, 'error')
         elif action == 'reject' and pending_id:
-        # Remove pending registration
-        # TODO: Implement database version
-        # if pending_id in treasurer_app.pending_brothers:
+            # Remove pending registration
+            # TODO: Implement database version
+            # if pending_id in treasurer_app.pending_brothers:
                 # TODO: Implement database version
                 # del treasurer_app.pending_brothers[pending_id]
                 # TODO: Implement database version
@@ -2498,7 +2498,7 @@ def verify_brothers():
         else:
                 flash('Registration not found.', 'error')
         
-        return redirect(url_for('verify_brothers'))
+            return redirect(url_for('verify_brothers'))
         
     except Exception as e:
         print(f"❌ Verify brothers error: {e}")
@@ -2517,7 +2517,7 @@ def role_management():
         db_members = MemberModel.query.all()
         members = {}
         for member in db_members:
-        members[str(member.id)] = member
+            members[str(member.id)] = member
     # Log current executive board for debugging
     executive_roles = ['treasurer', 'president', 'vice_president', 'social_chair', 'phi_ed_chair', 'brotherhood_chair', 'recruitment_chair']
     print(f"✅ Current Executive Board:")
@@ -2534,9 +2534,9 @@ def role_management():
                 assigned_members.append(member_name)
         
         if assigned_members:
-        print(f"  {exec_role}: {', '.join(assigned_members)}")
+            print(f"  {exec_role}: {', '.join(assigned_members)}")
         else:
-        print(f"  {exec_role}: VACANT")
+            print(f"  {exec_role}: VACANT")
     
     return render_template('role_management.html', members=members)
 
@@ -2557,27 +2557,27 @@ def assign_role():
         
         member = MemberModel.query.get(member_id)
         if not member:
-        flash('Member not found.', 'error')
-        return redirect(url_for('role_management'))
+            flash('Member not found.', 'error')
+            return redirect(url_for('role_management'))
         
-        # Check if role is already taken
+            # Check if role is already taken
         if role != 'brother':
-        existing_member = MemberModel.query.filter_by(role=role).first()
+            existing_member = MemberModel.query.filter_by(role=role).first()
         if existing_member and str(existing_member.id) != member_id:
                 flash(f'{role.replace("_", " ").title()} position is already filled by {existing_member.full_name}.', 'warning')
                 return redirect(url_for('role_management'))
         
-        # Update member role in database
-        old_role = member.role or 'brother'
-        member.role = role
+            # Update member role in database
+            old_role = member.role or 'brother'
+            member.role = role
         
-        # Update user roles if user account exists
+            # Update user roles if user account exists
         if member.user:
-        user = member.user
-        # Clear existing roles except admin
-        user.roles = [r for r in user.roles if r.name == 'admin']
+            user = member.user
+            # Clear existing roles except admin
+            user.roles = [r for r in user.roles if r.name == 'admin']
         
-        # Add new role
+            # Add new role
         if role != 'brother':
                 role_obj = Role.query.filter_by(name=role).first()
                 if not role_obj:
@@ -2585,24 +2585,24 @@ def assign_role():
                     db.session.add(role_obj)
                 user.roles.append(role_obj)
         
-        # Ensure brother role
-        brother_role = Role.query.filter_by(name='brother').first()
+            # Ensure brother role
+            brother_role = Role.query.filter_by(name='brother').first()
         if not brother_role:
                 brother_role = Role(name='brother', description='Brother role')
                 db.session.add(brother_role)
         if brother_role not in user.roles:
                 user.roles.append(brother_role)
         
-        try:
-        db.session.commit()
-        flash(f'{member.full_name} has been successfully assigned as {role.replace("_", " ").title()}.', 'success')
-        print(f"✅ Database role assignment: {member.full_name} -> {role}")
+            try:
+            db.session.commit()
+            flash(f'{member.full_name} has been successfully assigned as {role.replace("_", " ").title()}.', 'success')
+            print(f"✅ Database role assignment: {member.full_name} -> {role}")
         except Exception as e:
-        db.session.rollback()
-        flash(f'Error assigning role: {e}', 'error')
-        print(f"❌ Database role assignment failed: {e}")
+            db.session.rollback()
+            flash(f'Error assigning role: {e}', 'error')
+            print(f"❌ Database role assignment failed: {e}")
         
-        return redirect(url_for('role_management'))
+            return redirect(url_for('role_management'))
     
     else:
         flash('Application not properly initialized', 'error')
@@ -2626,7 +2626,7 @@ def assign_role():
     try:
         from models import db, User, Role
         if hasattr(member, 'user_id') and member.user_id:
-        user = User.query.get(member.user_id)
+            user = User.query.get(member.user_id)
         if user:
                 # Clear existing roles (except admin which should be preserved)
                 user.roles = [r for r in user.roles if r.name == 'admin']
@@ -2722,7 +2722,7 @@ def change_role():
     try:
         from models import db, User, Role
         if hasattr(member, 'user_id') and member.user_id:
-        user = User.query.get(member.user_id)
+            user = User.query.get(member.user_id)
         if user:
                 # Clear existing roles (except admin which should be preserved)
                 user.roles = [r for r in user.roles if r.name == 'admin']
@@ -2890,25 +2890,25 @@ def chair_budget_management():
         accessible = can_view_all_budgets or (user_chair_type == chair_type)
         
         if accessible:
-        # Get budget data for this chair category
+            # Get budget data for this chair category
                 # Database mode - get data from SQLAlchemy models
                 budget_data = get_chair_budget_data_db(chair_type)
         else:
                 # Fallback data
                 budget_data = get_mock_chair_budget_data(chair_type)
         
-        chair_budgets[chair_type] = {
+            chair_budgets[chair_type] = {
                 'display_name': display_name,
                 'accessible': True,
                 'is_own_budget': (user_chair_type == chair_type),
                 **budget_data
-        }
+            }
         else:
-        chair_budgets[chair_type] = {
+            chair_budgets[chair_type] = {
                 'display_name': display_name,
                 'accessible': False,
                 'is_own_budget': False
-        }
+            }
     
     return render_template('chair_budget_management.html',
                          chair_budgets=chair_budgets,
@@ -3070,12 +3070,12 @@ def adjust_chair_budget():
         
         category = category_mapping.get(chair_type)
         if not category:
-        return jsonify({'success': False, 'error': 'Invalid chair type'})
+            return jsonify({'success': False, 'error': 'Invalid chair type'})
         
-        # Update budget in database
-        # TODO: Implement database budget update
-        pass
-        return jsonify({'success': True, 'message': f'Budget updated for {category}'})
+            # Update budget in database
+            # TODO: Implement database budget update
+            pass
+            return jsonify({'success': True, 'message': f'Budget updated for {category}'})
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
@@ -3156,10 +3156,10 @@ def debug_payment_status():
         member_data = []
         
         for member in members:
-        payment_count = len(member.payments)
-        total_paid = sum(p.amount for p in member.payments)
+            payment_count = len(member.payments)
+            total_paid = sum(p.amount for p in member.payments)
         
-        member_data.append({
+            member_data.append({
                 'name': member.name,
                 'dues': member.dues_amount,
                 'payment_count': payment_count,
@@ -3169,12 +3169,12 @@ def debug_payment_status():
                     'date': p.date.strftime('%Y-%m-%d'),
                     'method': p.payment_method
                 } for p in member.payments[:3]]  # First 3 payments
-        })
+            })
         
-        return {
-        'member_payment_data': member_data,
-        'total_payments_in_db': Payment.query.count()
-        }
+            return {
+            'member_payment_data': member_data,
+            'total_payments_in_db': Payment.query.count()
+            }
         
     except Exception as e:
         return {'error': str(e)}
@@ -3244,20 +3244,20 @@ def debug_fix_admin_role():
         admin_role = Role.query.filter_by(name='admin').first()
         
         if not admin_user:
-        return {'error': 'Admin user not found'}
+            return {'error': 'Admin user not found'}
         
         if not admin_role:
-        return {'error': 'Admin role not found - try /debug/fix_roles first'}
+            return {'error': 'Admin role not found - try /debug/fix_roles first'}
         
-        # Check current roles
-        current_roles = [r.name for r in admin_user.roles]
+            # Check current roles
+            current_roles = [r.name for r in admin_user.roles]
         
         if 'admin' not in current_roles:
-        admin_user.roles.append(admin_role)
-        db.session.commit()
-        return {'success': True, 'message': f'Admin role added. User now has roles: {[r.name for r in admin_user.roles]}'}
+            admin_user.roles.append(admin_role)
+            db.session.commit()
+            return {'success': True, 'message': f'Admin role added. User now has roles: {[r.name for r in admin_user.roles]}'}
         else:
-        return {'success': True, 'message': f'Admin user already has admin role. Current roles: {current_roles}'}
+            return {'success': True, 'message': f'Admin user already has admin role. Current roles: {current_roles}'}
         
     except Exception as e:
         return {'error': str(e)}
