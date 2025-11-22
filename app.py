@@ -5,10 +5,7 @@ from email.mime.text import MIMEText
 import os
 import json
 from typing import Dict, List, Optional
-import uuid
 from dotenv import load_dotenv
-import hashlib
-import re
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 
 # Database imports
@@ -622,23 +619,6 @@ def force_logout():
     flash('All sessions cleared - Please log in again')
     return redirect(url_for('login'))
 
-@app.route('/change_password', methods=['GET', 'POST'])
-@require_auth
-def change_password():
-    if request.method == 'GET':
-        return render_template('change_password.html')
-    
-    old_password = request.form['old_password']
-    new_password = request.form['new_password']
-    confirm_password = request.form['confirm_password']
-    
-    if new_password != confirm_password:
-        flash('New passwords do not match')
-        return redirect(url_for('change_password'))
-    
-    # TODO: Implement change_password with database
-    flash('Password change not yet implemented')
-    return redirect(url_for('dashboard'))
 
 @app.route('/monthly_income')
 @require_auth
@@ -781,26 +761,7 @@ def dashboard():
         print(f"❌ Dashboard traceback: {traceback.format_exc()}")
         return f"Dashboard Error: {str(e)}", 500
 
-@app.route('/enhanced')
-@require_auth
-def enhanced_dashboard():
-    # TODO: Implement full enhanced dashboard with database
-    # For now, redirect to main dashboard
-    return redirect(url_for('dashboard'))
 
-@app.route('/add_member', methods=['POST'])
-@require_auth
-@require_permission('add_members')
-def add_member():
-    name = request.form['name']
-    contact = request.form.get('contact', request.form.get('phone', ''))  # Support both field names
-    dues_amount = float(request.form['dues_amount'])
-    payment_plan = request.form['payment_plan']
-    
-    # TODO: Implement database version
-    # member_id = treasurer_app.add_member(name, contact, dues_amount, payment_plan)
-    flash(f'Member {name} added successfully!')
-    return redirect(url_for('dashboard'))
 
 @app.route('/add_transaction', methods=['POST'])
 @require_auth
@@ -1535,36 +1496,6 @@ def budget_management():
         flash(f'Error loading budget management: {str(e)}', 'error')
         return redirect(url_for('dashboard'))
 
-@app.route('/edit_budget_category/<category>', methods=['GET', 'POST'])
-@require_auth
-@require_permission('manage_budgets')
-def edit_budget_category(category):
-    if category not in BUDGET_CATEGORIES:
-        flash('Invalid budget category!')
-        return redirect(url_for('budget_management'))
-    
-    if request.method == 'GET':
-        # TODO: Implement database version
-        # current_limit = treasurer_app.get_budget_limit(category)
-        # TODO: Implement database version
-        # budget_summary = treasurer_app.get_budget_summary()
-        category_summary = budget_summary.get(category, {})
-        
-        return render_template('edit_budget_category.html',
-                             category=category,
-                             current_limit=current_limit,
-                             summary=category_summary)
-    
-    # POST request - update single category
-    try:
-        amount = float(request.form['amount'])
-        # TODO: Implement database version
-        # treasurer_app.update_budget_limit(category, amount)
-        flash(f'Budget limit for {category} updated successfully!')
-    except ValueError:
-        flash('Invalid amount entered!')
-    
-    return redirect(url_for('budget_management'))
 
 @app.route('/custom_payment_schedule/<member_id>', methods=['GET', 'POST'])
 @require_auth
@@ -2705,111 +2636,7 @@ def get_chair_budget_data_db(chair_type):
     }
 
 
-def get_mock_chair_budget_data(chair_type):
-    """Get mock chair budget data for demo/fallback"""
-    import random
-    
-    # Mock budget allocations
-    budget_limits = {
-        'social': 2500.0,
-        'phi_ed': 1500.0,
-        'brotherhood': 2000.0,
-        'recruitment': 3000.0
-    }
-    
-    budget_limit = budget_limits.get(chair_type, 1000.0)
-    total_spent = random.uniform(budget_limit * 0.3, budget_limit * 0.8)
-    pending_amount = random.uniform(0, budget_limit * 0.2)
-    remaining = budget_limit - total_spent - pending_amount
-    usage_percentage = (total_spent / budget_limit * 100) if budget_limit > 0 else 0
-    
-    # Mock expenses
-    mock_expenses = [
-        {
-        'date': '2024-10-14',
-        'description': f'{chair_type.title()} event supplies',
-        'category': chair_type.title(),
-        'amount': 150.00,
-        'status': 'completed',
-        'notes': 'Pizza for brotherhood event'
-        },
-        {
-        'date': '2024-10-10', 
-        'description': f'{chair_type.title()} venue rental',
-        'category': chair_type.title(),
-        'amount': 300.00,
-        'status': 'completed',
-        'notes': ''
-        }
-    ]
-    
-    # Mock spending plans
-    mock_plans = [
-        {
-        'title': f'{chair_type.title()} Semester Plan',
-        'description': f'Budget plan for {chair_type} activities this semester',
-        'amount': budget_limit * 0.8,
-        'status': 'approved',
-        'created_date': '2024-09-01',
-        'creator': f'{chair_type.title()} Chair'
-        }
-    ]
-    
-    # Mock reimbursements
-    mock_reimbursements = [
-        {
-        'purpose': f'{chair_type.title()} supplies',
-        'amount': 75.00,
-        'submitted_date': '2024-10-12',
-        'submitter': f'{chair_type.title()} Chair',
-        'receipt': True
-        }
-    ] if random.random() > 0.5 else []
-    
-    return {
-        'budget_limit': budget_limit,
-        'total_spent': total_spent,
-        'pending_amount': pending_amount,
-        'remaining': remaining,
-        'usage_percentage': min(usage_percentage, 100),
-        'expenses_count': len(mock_expenses),
-        'spending_plans': mock_plans,
-        'pending_reimbursements': mock_reimbursements,
-        'recent_expenses': mock_expenses
-    }
 
-@app.route('/chair_budget_management/adjust_budget', methods=['POST'])
-@require_auth
-@require_permission('manage_budgets')
-def adjust_chair_budget():
-    """Adjust budget allocation for a chair category"""
-    data = request.get_json()
-    chair_type = data.get('chair_type')
-    amount = data.get('amount')
-    
-    if not chair_type or amount is None:
-        return jsonify({'success': False, 'error': 'Missing chair_type or amount'})
-    
-    try:
-        # Map chair types to budget categories
-        category_mapping = {
-        'social': 'Social',
-        'phi_ed': 'Phi ED',
-        'brotherhood': 'Brotherhood',
-        'recruitment': 'Recruitment'
-        }
-        
-        category = category_mapping.get(chair_type)
-        if not category:
-            return jsonify({'success': False, 'error': 'Invalid chair type'})
-        
-            # Update budget in database
-            # TODO: Implement database budget update
-            pass
-            return jsonify({'success': True, 'message': f'Budget updated for {category}'})
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/chair_budget_management/export/<chair_type>')
 @require_auth
